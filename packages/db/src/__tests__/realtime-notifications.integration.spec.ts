@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { requireLocalTestDatabase } from "./local-realtime-test-database";
 
 const databaseUrl = process.env.REALTIME_NOTIFICATION_TEST_DATABASE_URL;
 const suite = databaseUrl ? describe : describe.skip;
@@ -8,22 +9,6 @@ const migrationPath = path.resolve(
   __dirname,
   "../../prisma/migrations/20261204000000_transactional_realtime_notifications/migration.sql",
 );
-
-function requireLocalTestDatabase(connectionString: string): string {
-  const url = new URL(connectionString);
-  if (
-    !["postgres:", "postgresql:"].includes(url.protocol) ||
-    !["localhost", "127.0.0.1"].includes(url.hostname) ||
-    url.pathname !== "/pathway_realtime_notifications_test" ||
-    url.search !== "" ||
-    url.hash !== ""
-  ) {
-    throw new Error(
-      "Use the dedicated local pathway_realtime_notifications_test database",
-    );
-  }
-  return url.toString();
-}
 
 function sql(statement: string): string {
   if (!databaseUrl) throw new Error("Notification test database is required");

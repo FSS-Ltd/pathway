@@ -5,7 +5,7 @@ import {
 } from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import {
-  messageConversationRealtimeTopic,
+  messageUserRealtimeTopic,
   type MessageRealtimeSubscription,
 } from "@pathway/platform";
 import { SignJWT } from "jose";
@@ -101,13 +101,14 @@ async function issueToken(
 ): Promise<MessageRealtimeSubscription> {
   const config = realtimeConfiguration();
   const { key, kid } = await loadRealtimeSigningKey();
-  const topic = messageConversationRealtimeTopic(conversationId);
+  const topic = messageUserRealtimeTopic(actor.tenantId, actor.userId);
   const issuedAt = Math.floor(Date.now() / 1_000);
   const expiresAt = issuedAt + TOKEN_LIFETIME_SECONDS;
   const token = await new SignJWT({
     role: "authenticated",
     ace_realtime_topics: [topic],
     ace_site_id: actor.tenantId,
+    ace_realtime_conversation_id: conversationId,
     ace_org_id: actor.orgId,
   })
     .setProtectedHeader({ alg: "ES256", kid, typ: "JWT" })
@@ -125,7 +126,7 @@ async function issueToken(
     private: true,
     expiresAt: new Date(expiresAt * 1_000).toISOString(),
     authoritativeSource: "rest",
-    refetchOn: ["reconnect", "event_loss", "token_refresh"],
+    refetchOn: ["reconnect", "event_loss"],
   };
 }
 

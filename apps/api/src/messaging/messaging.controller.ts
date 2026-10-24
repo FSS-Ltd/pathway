@@ -38,7 +38,6 @@ import { StaffSchoolTeamReadCursorService } from "./staff-school-team-read-curso
 import { StaffSchoolTeamCommandService } from "./staff-school-team-command.service";
 import { StaffSchoolTeamService } from "./staff-school-team.service";
 import { MessagingBoundaryAuditInterceptor } from "./messaging-boundary-audit.interceptor";
-import { MessageRealtimePublisher } from "./message-realtime.publisher";
 
 @UseGuards(AuthUserGuard, PermissionGuard)
 @UseInterceptors(MessagingBoundaryAuditInterceptor)
@@ -60,8 +59,6 @@ export class MessagingController {
     private readonly schoolTeamCommands: StaffSchoolTeamCommandService,
     @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
-    @Inject(MessageRealtimePublisher)
-    private readonly realtime: MessageRealtimePublisher,
   ) {}
 
   @Get()
@@ -169,11 +166,6 @@ export class MessagingController {
         conversationId,
         await readCursorSchema.parseAsync(body),
       );
-      await this.realtime.publishAfterCommit({
-        type: "conversation.read",
-        conversationId,
-        readerScope: "participant",
-      });
       return result;
     } catch (error) {
       if (error instanceof z.ZodError)
@@ -194,13 +186,6 @@ export class MessagingController {
         conversationId,
         await sendMessageSchema.parseAsync(body),
       );
-      if (!result.reused) {
-        await this.realtime.publishAfterCommit({
-          type: "message.created",
-          conversationId,
-          messageId: result.id,
-        });
-      }
       return result;
     } catch (error) {
       if (error instanceof z.ZodError)
@@ -221,13 +206,6 @@ export class MessagingController {
         conversationId,
         await sendMessageSchema.parseAsync(body),
       );
-      if (!result.reused) {
-        await this.realtime.publishAfterCommit({
-          type: "message.created",
-          conversationId,
-          messageId: result.id,
-        });
-      }
       return result;
     } catch (error) {
       if (error instanceof z.ZodError)
@@ -247,11 +225,6 @@ export class MessagingController {
         conversationId,
         await readCursorSchema.parseAsync(body),
       );
-      await this.realtime.publishAfterCommit({
-        type: "conversation.read",
-        conversationId,
-        readerScope: "participant",
-      });
       return result;
     } catch (error) {
       if (error instanceof z.ZodError)

@@ -137,18 +137,22 @@ async function run(): Promise<void> {
       });
     }
     return jsonResponse({
-      items: url.pathname.includes("/site-one/")
-        ? [
-            {
-              id: conversationId,
-              kind: "PARENT_STAFF",
-              title: "School team",
-              latestMessage: { preview: "Hello from school", createdAt: date },
-              updatedAt: date,
-              unreadCount: cursorSaved ? 0 : 1,
-            },
-          ]
-        : [],
+      items:
+        url.pathname.includes("/site-one/") ||
+        (url.pathname.includes("/site-new/") && openCount > 0)
+          ? [
+              {
+                id: conversationId,
+                kind: "PARENT_STAFF",
+                title: "School team",
+                latestMessage: url.pathname.includes("/site-one/")
+                  ? { preview: "Hello from school", createdAt: date }
+                  : null,
+                updatedAt: date,
+                unreadCount: cursorSaved ? 0 : 1,
+              },
+            ]
+          : [],
       nextCursor: null,
     });
   };
@@ -165,6 +169,17 @@ async function run(): Promise<void> {
       ),
     );
     assert.match(container.textContent ?? "", /Hello from school/);
+    assert.match(container.textContent ?? "", /Disconnected/);
+    const refreshMessages = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent === "Refresh messages");
+    assert.ok(
+      refreshMessages,
+      "disconnected readers can explicitly refresh messages",
+    );
+    const readsBeforeRefresh = threadReads;
+    await act(async () => refreshMessages.click());
+    assert.equal(threadReads, readsBeforeRefresh + 1);
     assert.equal(cursorSaved, true);
     assert.ok(container.querySelector('label[for="parent-message-draft"]'));
     const textarea = container.querySelector("textarea");
@@ -212,7 +227,7 @@ async function run(): Promise<void> {
     assert.match(container.textContent ?? "", /Conversation unavailable/);
     assert.doesNotMatch(
       container.textContent ?? "",
-      /Live updates|Connecting updates|Refreshing automatically/,
+      /Live updates|Connecting updates|Disconnected/,
     );
     const readsAfterDenial = threadReads;
     await act(async () => window.dispatchEvent(new dom.window.Event("focus")));

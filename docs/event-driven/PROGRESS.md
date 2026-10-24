@@ -4,13 +4,13 @@ Approved plan: [Event-driven updates and worker wakeups](README.md).
 Base: FSS-Ltd/pathway `master`; step 1.1 starts at
 `82770da7fd836d031c2e3ed76f127e5c723a5249` (PR #734 merged).
 
-| Step | State                        | PR / evidence                                                            | Next permitted action                                          |
-| ---- | ---------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| 1.1  | PR open; review fix verified | [#736](https://github.com/FSS-Ltd/pathway/pull/736); local checks passed | Verify latest-head CI; obtain production merge authorization   |
-| 1.2  | Planned                      | No implementation started                                                | Wait for 1.1 PR, current-revision green CI and confirmed merge |
-| 1.3  | Planned                      | No implementation started                                                | Wait for 1.2 gate                                              |
-| 1.4  | Planned                      | No implementation started                                                | Wait for 1.3 gate                                              |
-| 1.5  | Planned                      | No implementation started                                                | Wait for 1.4 gate                                              |
+| Step | State       | PR / evidence                                                                                                | Next permitted action                                       |
+| ---- | ----------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| 1.1  | Merged      | [#736](https://github.com/FSS-Ltd/pathway/pull/736), merge `0ae915f8`; all 12 current-revision checks passed | Observe authorized deployment; capture remains off          |
+| 1.2  | In progress | Branch `build/event-driven-1-2`, base `0ae915f8`                                                             | Implement and verify messaging conversion; raise its own PR |
+| 1.3  | Planned     | No implementation started                                                                                    | Wait for 1.2 gate                                           |
+| 1.4  | Planned     | No implementation started                                                                                    | Wait for 1.3 gate                                           |
+| 1.5  | Planned     | No implementation started                                                                                    | Wait for 1.4 gate                                           |
 
 ## Step 1.1 decisions and evidence
 
@@ -60,3 +60,34 @@ record. Do not mark this step complete from local checks or a pushed branch alon
   outside this review; it has not been implemented or claimed complete.
 - Latest pushed revision, CI results and merge state are recorded in PR #736's
   delivery record. Step 1.2 remains gated until current-revision CI and merge.
+
+## Step 1.1 merge evidence
+
+- User authorized merge and its production deployment after passing CI.
+- Checked head: `fc9acaefbfc911a67b51237dc3d258db47f7f220`; [CI](https://github.com/FSS-Ltd/pathway/actions/runs/40030912057) and all 12 checks passed.
+- Verified hosted merge at `2026-10-23T22:42:13Z`: `0ae915f8c70b258056ec10164fff225da4c3d62a`.
+- Tested merge `a1724431` and actual merge have identical tree `89eee1e4289dba3ed6a3d839ff7ad66cadc5b10e`.
+- [Deployment](https://github.com/FSS-Ltd/pathway/actions/runs/40035308020): all migration, web, admin and API deployment jobs passed.
+- The isolated checkout is reused for the active next step; original user changes remain untouched.
+
+## Step 1.2 implementation verification (not merged)
+
+- Replaced recurring messaging reads with an explicit subscription lifecycle,
+  in-place authentication renewal, bounded reconnect and manual refresh.
+- Durable private user/site inbox invalidations commit with source mutations;
+  authorized anchor claims preserve existing join permission checks. Current
+  recipients are rechecked for each publication, including other conversations.
+- Local Supabase provider: all 11 cases passed, including read cursors, rollback,
+  strict queue failure, duplicate delivery, forced RLS, signed-scope isolation,
+  revocation, off-screen inbox updates, token renewal and transport recovery.
+- Platform: 249 passed, five pre-existing skipped. Database: 96 passed,
+  33 pre-existing skipped. Browser unit suite and configured build passed before
+  the final inbox-topic contract update; final checks are still in progress.
+- Full API unit attempt exhausted Node's heap; a recyclable-worker attempt was
+  stopped due repeated compiler reloads. Run four bounded shards for full coverage.
+  HTTP security verification, current builds and review remain pending.
+- Upstream #737 advanced master to `85d449db`; integrate that verified finance
+  release before final verification and the step's PR. No next-step work started.
+- [Activation and recovery runbook](MESSAGING-RUNBOOK.md) records migration impact,
+  provider versions and hosted restart/upgrade verification limits. Production
+  merge/activation authorization is still required for this step.

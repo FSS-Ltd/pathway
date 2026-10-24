@@ -119,12 +119,12 @@ let realtimeVerificationKey: KeyLike;
 
 async function realtimePolicyAllows(
   claims: JWTPayload,
-  conversationId: string,
+  requestedSiteId = String(claims.ace_site_id),
 ): Promise<boolean> {
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT set_config('request.jwt.claims', ${JSON.stringify(claims)}, true)`;
     const [row] = await tx.$queryRaw<Array<{ allowed: boolean }>>`
-      SELECT app.authorize_ace_realtime_topic(${`ace:conversation:${conversationId}`}) AS allowed
+      SELECT app.authorize_ace_realtime_topic(${`ace:conversation:site:${Buffer.from(requestedSiteId).toString("hex")}:user:${Buffer.from(String(claims.sub)).toString("hex")}`}) AS allowed
     `;
     return row?.allowed ?? false;
   });
@@ -455,26 +455,22 @@ describe("ACE family messaging web security gate", () => {
         sub: userId,
         role: "authenticated",
         ace_site_id: siteId,
+        ace_realtime_conversation_id: conversationId,
         ace_org_id: orgId,
-        ace_realtime_topics: [`ace:conversation:${conversationId}`],
+        ace_realtime_topics: [
+          `ace:conversation:site:${Buffer.from(siteId).toString("hex")}:user:${Buffer.from(userId).toString("hex")}`,
+        ],
       });
       expect(response.body).toMatchObject({
         private: true,
         authoritativeSource: "rest",
-        refetchOn: ["reconnect", "event_loss", "token_refresh"],
+        refetchOn: ["reconnect", "event_loss"],
       });
       expect(response.headers["cache-control"]).toBe("no-store");
-      expect(await realtimePolicyAllows(verified.payload, conversationId)).toBe(
-        true,
+      expect(await realtimePolicyAllows(verified.payload)).toBe(true);
+      expect(await realtimePolicyAllows(verified.payload, otherSiteId)).toBe(
+        false,
       );
-      expect(
-        await realtimePolicyAllows(
-          verified.payload,
-          parentConversationId === conversationId
-            ? staffConversationId
-            : parentConversationId,
-        ),
-      ).toBe(false);
     }
 
     await request(server)
@@ -531,9 +527,7 @@ describe("ACE family messaging web security gate", () => {
     );
     await prisma.orgVertical.delete({ where: { orgId } });
     try {
-      expect(await realtimePolicyAllows(payload, staffConversationId)).toBe(
-        false,
-      );
+      expect(await realtimePolicyAllows(payload)).toBe(false);
       await request(app.getHttpServer())
         .post(`${staffPath}/${staffConversationId}/realtime-token`)
         .set("Authorization", authorization.teacher)
@@ -565,9 +559,7 @@ describe("ACE family messaging web security gate", () => {
       data: { isActive: false },
     });
     try {
-      expect(await realtimePolicyAllows(payload, staffConversationId)).toBe(
-        false,
-      );
+      expect(await realtimePolicyAllows(payload)).toBe(false);
     } finally {
       await prisma.orgRoleDefinition.update({
         where: { id: assignment.roleDefinitionId },
@@ -747,9 +739,7 @@ describe("ACE family messaging web security gate", () => {
     });
     try {
       await expectUnavailable();
-      expect(await realtimePolicyAllows(payload, parentConversationId)).toBe(
-        false,
-      );
+      expect(await realtimePolicyAllows(payload)).toBe(false);
     } finally {
       await prisma.org.update({
         where: { id: orgId },
@@ -763,9 +753,7 @@ describe("ACE family messaging web security gate", () => {
       }),
     );
     await expectUnavailable();
-    expect(await realtimePolicyAllows(payload, parentConversationId)).toBe(
-      false,
-    );
+    expect(await realtimePolicyAllows(payload)).toBe(false);
     expect(
       await prisma.message.count({
         where: { tenantId: siteId, conversationId: parentConversationId },
@@ -792,9 +780,7 @@ describe("ACE family messaging web security gate", () => {
       where: { tenantId_userId: { tenantId: siteId, userId: teacherId } },
     });
     try {
-      expect(await realtimePolicyAllows(payload, staffConversationId)).toBe(
-        false,
-      );
+      expect(await realtimePolicyAllows(payload)).toBe(false);
       const paths = [
         staffPath,
         `${staffPath}/recipients`,

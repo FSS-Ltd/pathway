@@ -95,10 +95,21 @@ export function ConversationDetail({
                 ? "Live updates"
                 : messaging.realtimeStatus === "connecting"
                   ? "Connecting updates…"
-                  : "Refreshing automatically"}
+                  : "Disconnected"}
             </p>
           ) : null}
         </div>
+        {!messaging.threadAccessLost ? (
+          <Button
+            type="button"
+            variant="secondary"
+            className="ml-auto shrink-0"
+            onClick={messaging.retryThread}
+            disabled={messaging.threadLoading}
+          >
+            Refresh messages
+          </Button>
+        ) : null}
       </header>
 
       <div

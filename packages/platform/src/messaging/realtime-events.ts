@@ -20,11 +20,17 @@ export interface MessageRealtimeSubscription {
   private: true;
   expiresAt: string;
   authoritativeSource: "rest";
-  refetchOn: readonly ["reconnect", "event_loss", "token_refresh"];
+  refetchOn: readonly ["reconnect", "event_loss"];
 }
 
-export function messageConversationRealtimeTopic(
-  conversationId: string,
+/** One private inbox per user/site; encode segments to prevent delimiter collisions. */
+export function messageUserRealtimeTopic(
+  siteId: string,
+  userId: string,
 ): string {
-  return `ace:conversation:${conversationId}`;
+  const encode = (value: string) =>
+    Array.from(new TextEncoder().encode(value), (byte) =>
+      byte.toString(16).padStart(2, "0"),
+    ).join("");
+  return `ace:conversation:site:${encode(siteId)}:user:${encode(userId)}`;
 }
