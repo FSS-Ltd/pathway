@@ -41,7 +41,7 @@ describe("FinanceStripeWebhookJob", () => {
 
     const result = await job.run(new Date("2026-10-18T00:00:00.000Z"));
 
-    expect(processor.process).toHaveBeenCalledWith(event);
+    expect(processor.process).toHaveBeenCalledWith(event, undefined);
     expect(store.renew).toHaveBeenCalledWith(event, expect.any(Date));
     expect(store.complete).toHaveBeenCalledWith(event);
     expect(result).toEqual({
@@ -80,18 +80,23 @@ describe("FinanceStripeWebhookJob", () => {
   });
 
   it("retries processor failures with bounded exponential delay", async () => {
-    const { event, store, processor, job } = setup();
-    processor.process.mockRejectedValue(new Error("temporary outage"));
-    const now = new Date("2026-10-18T00:00:00.000Z");
+    jest.useFakeTimers().setSystemTime(new Date("2026-10-18T00:00:00Z"));
+    try {
+      const { event, store, processor, job } = setup();
+      processor.process.mockRejectedValue(new Error("temporary outage"));
+      const now = new Date("2026-10-18T00:00:00.000Z");
 
-    const result = await job.run(now);
+      const result = await job.run(now);
 
-    expect(store.retry).toHaveBeenCalledWith(
-      event,
-      new Date(now.getTime() + 2 * 60_000),
-      "temporary outage",
-    );
-    expect(result.retried).toBe(1);
+      expect(store.retry).toHaveBeenCalledWith(
+        event,
+        new Date(now.getTime() + 2 * 60_000),
+        "temporary outage",
+      );
+      expect(result.retried).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("dead letters an event after the retry limit", async () => {
@@ -107,5 +112,40 @@ describe("FinanceStripeWebhookJob", () => {
       "permanent outage",
     );
     expect(result.deadLettered).toBe(1);
+  });
+
+  it("schedules a failed replay from failure time rather than stale discovery time", async () => {
+    jest.useFakeTimers().setSystemTime(new Date("2026-10-23T21:00:00Z"));
+    try {
+      const { event, store, processor, job } = setup();
+      processor.process.mockImplementation(async () => {
+        jest.setSystemTime(new Date("2026-10-23T21:01:00Z"));
+        throw new Error("late failure");
+      });
+      await job.run(new Date("2026-10-23T20:00:00Z"));
+      expect(store.retry).toHaveBeenCalledWith(
+        event,
+        new Date("2026-10-23T21:03:00Z"),
+        "late failure",
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("stops a claimed batch after the active event when shutdown starts", async () => {
+    const { event, store, processor, job } = setup();
+    const stop = new AbortController();
+    store.claim.mockResolvedValue([
+      event,
+      { ...event, id: "remaining-claimed-event" },
+    ]);
+    processor.process.mockImplementation(async () => {
+      stop.abort();
+      return "processed";
+    });
+    await job.run(new Date(), stop.signal);
+    expect(processor.process).toHaveBeenCalledTimes(1);
+    expect(store.renew).toHaveBeenCalledTimes(1);
   });
 });

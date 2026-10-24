@@ -180,19 +180,47 @@ reports, request starvation, failed SQL capture and dry-run regressions were
 observed failing before their fixes. Existing unit mocks were updated to represent
 empty aggregate history instead of returning unrelated lock rows.
 
-### Event-driven wakeup assurance gap (T18)
+### Event-driven wakeup source audit and correction (T18)
 
 The owner's updated engineering rules require committed changes to wake workers
 through events, with durable startup/reconnect catch-up and due-time retries.
-The signed Finance ingress currently commits its inbox record before returning,
-but does not signal the canonical worker. The worker CLI performs a bounded drain
-and exits; the gated five-minute workflow remains the normal discovery mechanism.
-This source audit identifies an unresolved T18 requirement, not a verified event
-implementation. No production service, deployment or new dependency was introduced.
+At the source-audit checkpoint, signed Finance ingress committed its inbox before
+returning but did not signal the canonical worker. The worker CLI performed a
+bounded drain and exited; the gated five-minute workflow supplied normal discovery.
+That source audit identified a T18 requirement. The subsequent dormant implementation
+is documented in [the event-delivery plan](event-driven-webhook-delivery.md).
 
 Before closure, verify post-commit delivery, duplicate handling, idle request/query
 counts, reconnect catch-up, tenant and revocation boundaries, unsubscribe cleanup
 and graceful shutdown. The existing bounded recovery workflow may remain only as
 a documented fallback with its reason, frequency and query budget. The local CI
 polling watcher was stopped; GitHub jobs continue independently. T19 remains
-unstarted while T18 and PR #735 are incomplete.
+unstarted while T18 assurance remains incomplete. PR #735 subsequently merged;
+that merge did not close the runtime/provider gates.
+
+The additive inbox trigger emits only an empty post-commit notification. An opt-in
+persistent worker subscribes before startup/reconnect catch-up, drains bounded
+canonical claims, and schedules persisted retry/lease deadlines. Permission or
+configuration failures stop intake; transient connections reconnect with bounded
+backoff. It makes no SQL discovery requests while idle. Supported refund/Bacs
+events missing linked evidence now persist retries; unsupported evidence stays held.
+
+Local PostgreSQL proofs cover commit/rollback, duplicate coalescing, mode separation,
+future-only plans, page-independent deadlines, silent claim renewal, revoked
+execute permission, backlog catch-up, forced disconnect/reconnect and closed
+clients. These do not prove production deployment or payer authority anew;
+canonical scoped replay retains its existing authorization and lease checks.
+
+Activation still requires an approved persistent host and a dedicated direct/session
+URL for a nonadministrative role. Explicitly grant schema USAGE and function EXECUTE;
+never grant this cross-tenant discovery function to a browser or family role.
+URLs accept only schema, pgbouncer and sslmode query parameters; remote connections
+always verify certificates. The enabled CLI also requires the existing worker TSX
+runtime and generated Prisma assets. No host or runtime grants were configured.
+
+The two additive indexes take normal migration locks. Apply through the controlled
+release procedure; no production migration was run. Keep the existing gated
+five-minute workflow unchanged until replacement activation is authorized and
+verified. A subsequent inbox safety fallback may use one bounded discovery every
+15 minutes (96/day) for missed notifications, not normal dispatch. Provider-side
+reconciliation remains separately necessary for missing Stripe evidence.

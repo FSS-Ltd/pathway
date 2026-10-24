@@ -175,13 +175,30 @@ export class FinanceStripeWebhookReplayService {
       payloadJson: event.payloadJson,
     };
     if (this.reversals.supports(event.eventType)) {
-      return this.reversals.process(webhookInput);
+      return requireFinanceWebhookDependency(
+        await this.reversals.process(webhookInput),
+      );
     }
     if (this.bacs.supports(event.eventType)) {
-      return this.bacs.process(webhookInput);
+      return requireFinanceWebhookDependency(
+        await this.bacs.process(webhookInput),
+      );
     }
     return this.payments.process(webhookInput);
   }
+}
+
+/** Supported handlers defer only while linked mandate/payment evidence is absent.
+ * Unknown handler types and Checkout states retain their separate hold path.
+ */
+function requireFinanceWebhookDependency(
+  result: "processed" | "deferred",
+): "processed" {
+  if (result === "deferred")
+    throw new ServiceUnavailableException(
+      "Finance payment evidence is not available yet",
+    );
+  return result;
 }
 
 function isAccountStatusEvent(eventType: string): boolean {
