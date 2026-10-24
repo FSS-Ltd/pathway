@@ -692,3 +692,19 @@ dependency and re-proof of Unicode and layout, several engineering days). C: pro
 accessible HTML or text alternative per document (moderate effort, no renderer change).
 **Recommendation.** C now, B only if a school or regulator requires tagged PDFs.
 **Decision needed.** Which option, before T19.
+
+## T18 continuation PR #741: merge gate passed
+
+GitHub confirmed [PR #741](https://github.com/FSS-Ltd/pathway/pull/741) merged into `master` on
+24 October 2026 at 17:03:35 UTC, merge commit `dd9a5bcf9bf389049a83e7612e1f72e175ccd856`.
+The checked head was `50b06d65f1a0c75242781f73be5fc78f9a56a547` against base
+`af52f5b727fbe6b6fac5a16061c0c28c2ee20cb9`. All thirteen current-revision checks reported
+SUCCESS: API serverless artifact (Node 24, 1024 descriptors), Analyze (actions), Private message
+Broadcast and request counts, Transactional realtime notification capture, Analyze
+(javascript-typescript), Typecheck, Lint & Unit Test, Integration Tests (1/2), Integration Tests
+(2/2), Finance Backup Restore, System Role Seed Database Identity, Permission Definition
+Database, Organisation Role RLS and CodeQL. No blocking review decision was recorded.
+
+This clears the storage and PDF continuation's delivery gate. Full T18 remains incomplete
+(hosted Bacs outcomes, Sandbox payouts, tagged PDF and VoiceOver, hosted storage ACL,
+persistent-host listener) and T19 has not started.
