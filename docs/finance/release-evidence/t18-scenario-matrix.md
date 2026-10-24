@@ -230,3 +230,105 @@ refund-return evidence resolves the case while preserving both ledger movements.
 Both complete database suites passed21 tests after behavioral RED. The initial
 nullable-fixture compilation failure ran no tests and is not RED proof. No real
 provider call, production migration or new receipt/allocation was introduced.
+
+E25: Event-driven inbox correction. Actual PostgreSQL RED showed no committed
+wake and no retry for early supported refund evidence. The additive trigger,
+restricted mode/deadline plan and opt-in persistent listener pass three new
+database suites/eight unique cases. With existing signed ingress/reversal suites,
+the final selected run passed five suites/29 tests. Coverage includes transactional
+commit/rollback, empty hints, future-only/page-independent deadlines, silent
+renewals, permission revocation, more-than-one-batch startup, reconnect catch-up,
+mode isolation and removal of actual subscription clients. The pure idle test
+advances 24 hours without additional SQL discovery. A minimal public-core migration
+smoke passed; full public-schema security is not established by that smoke.
+
+Independent review's shutdown race, URL override and code-less disconnect findings
+were reproduced by five failing regressions, then corrected; focused suites pass 30
+tests. The complete worker run passes 24 suites / 139 tests, with types/lint/isolated
+build passing. The enabled CLI reaches LISTEN, exits 0 after SIGTERM, leaves zero
+clients and makes no HTTP call for an empty inbox. These are disposable local
+proofs, not persistent-host deployment evidence. The listener stays disabled until
+host, session URL and least-privilege grants are approved and verified; current
+scheduled recovery remains unchanged. PR #735 merged at c886a54 after all eleven checks
+succeeded on f21c6cd. That CI predates E25 source and does not verify this correction.
+Mandatory Bacs, payout, private storage and accessibility proof remain open. T19
+has not started.
+
+E26: Actual hosted Bacs adapter RED/GREEN. A saved accepted synthetic mandate
+allowed a £1 direct-debit probe despite incomplete Sandbox school onboarding;
+its later `requires_payment_method` status is not a receipt. The actual hosted
+adapter returned 400 `parameter_unknown` for `setup_intent_data[usage]`. Removing
+the unsupported override created Bacs-only Checkout. The user explicitly approved
+its fictional bank mandate; browser submission plus account-scoped provider reads
+verified completed Checkout, succeeded SetupIntent, `off_session` usage and an
+active, correctly bound mandate. This separates payer setup from school onboarding
+readiness. Direct non-hosted SetupIntent confirmation is not a substitute for
+this flow.
+
+The real return exposed an encoded session placeholder. Its unit regression was
+RED; the corrected adapter preserves the literal template. Actual creation/readback
+and servicing expiry of one unsubmitted session passed. The first expiry assertion
+incorrectly expected null SetupIntent; read-only recovery instead verified its
+cancelled, unsubmitted object without repeating writes. Two full unit suites/27
+tests, API types/build and targeted lint/formatting passed. Final-head CI is still
+required. These provider-only fixtures do not prove full ledger posting, required
+asynchronous return/cancellation cases, payout eligibility or all T18 assurance.
+
+E27: Actual hosted normal-bank Bacs collection passed through canonical collection,
+genuine signed processing/success ingress, transactional PostgreSQL notification
+and the scoped worker. One £1 debit retained 100 minor units outstanding while
+processing,
+then produced one confirmed receipt/allocation and zero outstanding. Eight duplicates
+and two canonical success replays preserved the result. Shutdown left zero listener
+clients. A separate authenticated provider read verified gross 100, fee 20/net 80 and
+no platform fee/destination charge; payout balance remained pending with no payout.
+This supersedes the earlier claim that incomplete school onboarding blocks every
+Sandbox Bacs operation. It does not prove a live direct-charge configuration,
+the three-minute delayed bank, payout reconciliation or family return UI.
+
+E28: A separate actual £1 debit was cancelled through the canonical mandate service
+while processing. The outstanding 100 minor units and absence of a receipt were
+preserved. Interruption stopped the test; its missing handle and process absence
+were verified before
+recovery, and the debit was not submitted again. An authenticated account-scoped
+read found the same debit succeeded. Canonical `API_RECONCILIATION` capture and
+notification-driven worker processing yielded one receipt/allocation and zero
+outstanding with the mandate still cancelled. Two additional canonical replays
+preserved the result.
+Recovery made zero provider writes. The processing event was genuinely signed;
+the success was recovered from the provider API, not received as a signed webhook.
+Future submission on the detached method is not authorized by this proof.
+
+E29: PR737 CI run 40034294164 failed six cases across three suites on a38d9eb;
+its other 155 integration suites passed 899 tests. A listener fixture selected a
+dotenv fallback URL instead of Prisma's centrally bound database, and the exact-fee
+fixture used UTC dates for a London report after midnight. Both reproduced in a
+focused Node 24 run before correction. The corrected fixtures preserve all financial
+assertions and pass four complete database suites/ten tests, including a new stale
+URL regression. No production ledger, date policy or connection safeguard changed.
+An initial Node 20 compile was intentionally stopped under verified memory pressure
+and is not a test result. Fresh final-head CI/merge remains required. Five additional
+hosted asynchronous setups are prepared but unaccepted, pending explicit user
+confirmation after automatic approval review blocked navigation. Full T18/T19
+completion remains unproved.
+
+E30: CI 40041158216 on 97c1d33 supplied behavioral RED for the signed external-refund
+review report: 78 other shard-1 suites/502 tests passed, while the remaining UTC
+filter omitted a review created on the next London date. The fixture now spans
+the provider refund's London date through the current London date, using the
+existing calendar helper. All financial assertions remain. The complete ingress
+and principal/fee database suites pass two suites/11 tests; API types, focused
+lint, formatting and whitespace checks pass. Existing London period/projection
+units pass two suites/10 tests, including daylight-saving boundaries. Production
+report/ledger code is unchanged. Fresh final-revision CI and merge are still required.
+
+E31: Native iPhone 16e/iOS 26.3 component evidence confirms font scales 1.00/2.14
+at a 390-point viewport. A cold render enlarged custom fonts and wrapped the top
+invoice content. Computer-use coordinate/scroll input failed; full enlarged
+scrolling/control and VoiceOver assurance remain open. Mock actions establish no
+authenticated Family Space or provider result. The test device's preference was
+restored to 1.00, its server exited successfully and the device shut down. Five
+additional hosted Bacs setups remain pending despite explicit user approval:
+automatic browser review requires the human final submission. The bounded
+observer exited successfully with no received events or debits; actual inspection
+found no remaining listener connection or observer process. Full T18 is incomplete.

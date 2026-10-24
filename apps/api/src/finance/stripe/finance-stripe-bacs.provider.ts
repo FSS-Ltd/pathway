@@ -133,7 +133,7 @@ export class StripeFinanceBacsProvider implements FinanceStripeBacsProvider {
       this.config.webAppUrl,
     );
     successUrl.searchParams.set("mandate_id", input.mandateId);
-    successUrl.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
+    const successUrlWithSession = `${successUrl.toString()}&session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = new URL(
       "/family/finance/payment-methods",
       this.config.webAppUrl,
@@ -145,10 +145,9 @@ export class StripeFinanceBacsProvider implements FinanceStripeBacsProvider {
     form.set("locale", "en-GB");
     form.set("currency", "gbp");
     form.set("customer", input.stripeCustomerId);
-    form.set("success_url", successUrl.toString());
+    form.set("success_url", successUrlWithSession);
     form.set("cancel_url", cancelUrl.toString());
     form.set("allowed_payment_method_types[0]", "bacs_debit");
-    form.set("setup_intent_data[usage]", "off_session");
     form.set("metadata[finance_mandate_id]", input.mandateId);
     form.set("metadata[finance_payer_account_id]", input.payerAccountId);
     form.set(

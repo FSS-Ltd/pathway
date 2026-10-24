@@ -158,3 +158,30 @@ Five regression assertions failed before the fix; four focused suites / 37 tests
 The actual servicing reader retrieved the existing synthetic school's successful SetupIntent, active Mandate and `bacs_debit` PaymentMethod in the verified NexSteps Sandbox platform/account scope. All three objects were test mode; their customer/method/mandate references agreed. The generic and customer-bound PaymentMethod GETs returned the same identity and customer under the pinned `2026-09-30.endive` API version. The proof fetch transport rejected every non-GET request. No mandate, bank details, provider setting or payment was created or changed. Provider identifiers and credentials are omitted from this record.
 
 Mandate has no creation timestamp; the reader retains the available acceptance timestamp and does not invent a creation date. Acceptance IP/user-agent and bank/contact details are stripped. See [Mandate object](https://docs.stripe.com/api/mandates/object), [SetupIntent retrieval](https://docs.stripe.com/api/setup_intents/retrieve), [PaymentMethod retrieval](https://docs.stripe.com/api/payment_methods/retrieve) and [customer-bound PaymentMethod retrieval](https://docs.stripe.com/api/payment_methods/customer). The cancellation paths were verified with synthetic local data and provider doubles; no actual provider cancellation was submitted. This read proof does not establish card-charge eligibility or enable live Bacs.
+
+## T18 hosted setup revalidation — 23 October 2026
+
+Incomplete connected-account onboarding is still a payout/release gate, but it
+did not prevent every exercised Sandbox Bacs operation. A real direct-debit
+adapter request against an existing accepted synthetic mandate created a £1
+PaymentIntent in processing; a later read reported
+requires_payment_method. No confirmed receipt is inferred.
+
+The earlier direct-SetupIntent test harness did not exercise the supported
+hosted consent path. Stripe's actual Checkout endpoint rejected the product's
+`setup_intent_data[usage]` field with 400 parameter_unknown. Its removal retained
+off-session usage: the explicitly user-approved fictional payer completed hosted
+Bacs Checkout, and authenticated account-scoped reads verified succeeded setup,
+active mandate and consistent customer/method references in test mode. Setup
+created no payment. The school login/password step is separate from payer setup.
+
+The return URL also encoded Stripe's session placeholder. The corrected request
+keeps `{CHECKOUT_SESSION_ID}` literal after encoding the mandate identifier.
+A fresh unsubmitted session preserved that template and the real servicing adapter
+expired it. Readback verified a cancelled SetupIntent without a mandate or method
+and no PaymentIntent. No previously accepted mandate was detached or cancelled.
+
+These are provider-boundary proofs, not complete ledger, delayed return or payout
+assurance. No Custom Branding, production setting or live Bacs activation occurred.
+See [Checkout Session parameters](https://docs.stripe.com/api/checkout/sessions/create)
+and [Bacs integration requirements](https://docs.stripe.com/payments/bacs-debit).

@@ -393,10 +393,11 @@ describe("Finance signed HTTP ingress and durable replay assurance", () => {
     expect(reviewCases[0]?.events.map((item) => item.type)).toEqual([
       "DETECTED",
     ]);
-    const day = financeLocalDateKey(new Date());
+    const from = financeLocalDateKey(new Date(refund.created * 1000));
+    const to = financeLocalDateKey(new Date());
     const report = await new FinanceReportRepository(f.balances).loadSnapshot(
       f.actor,
-      { from: day, to: day, asOf: day },
+      { from, to, asOf: to },
     );
     expect(report.rows.some((row) => row.reference === refundReference)).toBe(
       true,

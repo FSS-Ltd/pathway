@@ -97,7 +97,7 @@ describe("StripeFinanceBacsProvider", () => {
     expect(form.get("metadata[finance_payer_account_id]")).toBe("payer-1");
   });
 
-  it("creates hosted Bacs setup with off-session consent and no custom branding", async () => {
+  it("creates hosted Bacs setup without unsupported SetupIntent overrides or custom branding", async () => {
     const fetcher = jest.fn().mockResolvedValue(
       stripeResponse({
         id: "cs_test_mandate",
@@ -135,7 +135,10 @@ describe("StripeFinanceBacsProvider", () => {
     expect(form.get("allowed_payment_method_types[0]")).toBe("bacs_debit");
     expect(form.get("currency")).toBe("gbp");
     expect(form.has("payment_method_types[0]")).toBe(false);
-    expect(form.get("setup_intent_data[usage]")).toBe("off_session");
+    expect(form.has("setup_intent_data[usage]")).toBe(false);
+    expect(form.get("success_url")).toBe(
+      "https://family.example.test/family/finance/mandate-return?mandate_id=mandate-1&session_id={CHECKOUT_SESSION_ID}",
+    );
     expect(form.get("setup_intent_data[metadata][finance_mandate_id]")).toBe(
       "mandate-1",
     );
