@@ -4,6 +4,7 @@ import { prisma, withTenantRlsContext } from "@pathway/db";
 import { requireDatabase } from "../../../test-helpers.e2e";
 import { FinanceStripeReversalWebhookService } from "../stripe/finance-stripe-reversal-webhook.service";
 import { FinanceReportRepository } from "../finance-report.repository";
+import { financeLocalDateKey } from "../finance-report-projection";
 import { recoverFinanceReversal } from "../reconciliation/finance-reversal-recovery.persistence";
 import {
   FinanceStripeWebhookReplayService,
@@ -392,10 +393,11 @@ describe("Finance signed HTTP ingress and durable replay assurance", () => {
     expect(reviewCases[0]?.events.map((item) => item.type)).toEqual([
       "DETECTED",
     ]);
-    const day = new Date().toISOString().slice(0, 10);
+    const from = financeLocalDateKey(new Date(refund.created * 1000));
+    const to = financeLocalDateKey(new Date());
     const report = await new FinanceReportRepository(f.balances).loadSnapshot(
       f.actor,
-      { from: day, to: day, asOf: day },
+      { from, to, asOf: to },
     );
     expect(report.rows.some((row) => row.reference === refundReference)).toBe(
       true,

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { withTenantRlsContext } from "@pathway/db";
 import { requireDatabase } from "../../../test-helpers.e2e";
 import { FinanceReportRepository } from "../finance-report.repository";
+import { financeLocalDateKey } from "../finance-report-projection";
 import { captureFinanceSettlementObservation } from "../reconciliation/finance-settlement.persistence";
 import { FinanceSettlementReportRepository } from "../reconciliation/finance-settlement-report.repository";
 import { createFinanceAssuranceFixture } from "./finance-assurance.fixture";
@@ -130,8 +131,14 @@ describe("Finance principal and processor fee assurance", () => {
         }),
       ).toEqual([{ amountMinor: 30000n }]);
     });
-    const day = now.toISOString().slice(0, 10);
-    const filters = { from: day, to: day, asOf: day };
+    const invoice = await f.invoices.get(f.actor, invoiceId);
+    // Include both posting dates if this real-database fixture crosses London
+    // midnight; the provider timestamp can precede invoice creation by a second.
+    const firstPosting = new Date(
+      Math.min(Date.parse(invoice.createdAt), created * 1000),
+    );
+    const to = financeLocalDateKey(new Date());
+    const filters = { from: financeLocalDateKey(firstPosting), to, asOf: to };
     const family = await new FinanceReportRepository(f.balances).loadSnapshot(
       f.actor,
       filters,
@@ -153,7 +160,7 @@ describe("Finance principal and processor fee assurance", () => {
       { currency: "GBP", amountMinor: "470" },
     ]);
     expect(settlement.payouts).toEqual([]);
-    expect((await f.invoices.get(f.actor, invoiceId)).balance).toMatchObject({
+    expect(invoice.balance).toMatchObject({
       allocatedReceiptsMinor: "30000",
       outstandingMinor: "0",
       creditBalanceMinor: "0",

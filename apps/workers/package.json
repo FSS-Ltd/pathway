@@ -14,6 +14,7 @@
     "retention:run": "tsx src/retention/run-retention.cli.ts",
     "billing:run": "tsx src/billing/run-billing.cli.ts",
     "finance:stripe-webhooks": "tsx src/finance/run-finance-stripe-webhooks.cli.ts",
+    "finance:stripe-webhooks:listen": "tsx src/finance/run-finance-stripe-webhook-listener.cli.ts",
     "addon-trials:expire": "tsx src/billing/expire-addon-trials.cli.ts",
     "guests:cleanup": "tsx src/guest-pass/run-guest-pass-cleanup.cli.ts",
     "outbox:dispatch": "tsx src/outbox/dispatch-outbox.cli.ts",
@@ -27,10 +28,12 @@
     "@pathway/ace-domain": "workspace:*",
     "@pathway/db": "workspace:*",
     "@pathway/types": "workspace:*",
-    "dotenv": "^17.2.2"
+    "dotenv": "^17.2.2",
+    "pg": "8.23.1"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
+    "@types/pg": "8.23.1",
     "eslint": "^9.34.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.2.5",

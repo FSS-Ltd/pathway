@@ -365,3 +365,224 @@ selected signed-ingress regression passed again (one executed test; nine exclude
 by the explicit name filter). Independent Sol review found no remaining P0–P2
 issue in this focused correction. The complete bounded API unit run remains in
 progress; neither old CI failure nor missing runtime evidence is waived.
+
+The bounded two-worker API rerun subsequently completed with exit0:368 suites and
+2464 tests passed. Jest reported one worker failing graceful teardown and forcing
+its exit; this is not proof of clean process shutdown. This checkpoint covers the
+storage/font/refund source before the new event-delivery continuation. New worker
+and dependency changes require their own checks; the aggregate is not being
+presented as verification of code added afterward.
+
+### T18 assurance correction merge and event-delivery continuation
+
+GitHub confirms [PR #735](https://github.com/FSS-Ltd/pathway/pull/735) merged into
+master on 23 October 2026 at 21:58:02 UTC, merge commit
+`c886a54d529c8ced8c5183e7f3ad31208999993b`. Its final checked revision was
+`f21c6cd436b85f98635c4cc447ef417a7dfbef47`. All eleven applicable checks succeeded:
+API serverless artifact; typecheck/lint/unit; both integration shards; Finance
+Backup Restore; System Role Seed Database Identity; Permission Definition
+Database; Organisation Role RLS; both Analyze jobs; CodeQL. CI run 40024101056 and
+CodeQL run 40024096831 cover that revision. This closes that correction PR's gate,
+not T18's remaining assurance or T19's pilot authorization.
+
+The event-delivery continuation stays within T18. A transactional empty PostgreSQL
+notification now accompanies runnable durable inbox changes. A disabled-by-default
+listener subscribes before catch-up, drains canonical scoped claims, schedules
+persisted deadlines and reconnects without idle SQL discovery. Supported Bacs and
+refund evidence missing linked records persists a retry instead of entering an
+unsupported-handler hold. No payment, balance or snapshot algorithm is replaced.
+The direct `pg` dependency is necessary because Prisma cannot subscribe to NOTIFY;
+existing lockfile resolutions are preserved. The 203rd migration adds only a
+trigger, restricted backend discovery function and two indexes. Index creation
+requires controlled migration locks; no production migration was applied.
+
+Independent Sol review found three P2 defects: immediate start/stop leaked a
+subscription, arbitrary URL query overrides bypassed connection safeguards, and
+pg's code-less unexpected disconnect was misclassified as configuration failure.
+Five new regression cases failed behaviorally before correction. The listener
+now checks shutdown before creating its client; URLs reject unsupported query
+overrides; connection-event failures retain a safe reconnectable classification.
+Both complete focused suites passed 30 tests afterward. Full worker verification
+passed 24 suites / 139 tests, typecheck, lint and a build with output isolated from
+API sources. Relevant API units passed 4 suites / 20 tests. Five real PostgreSQL
+suites passed 29 tests, including the three new suites' eight unique cases plus
+existing signed-ingress/reversal coverage. The minimal public-core migration
+smoke also passed; it is not a full public-schema security assurance claim.
+
+An enabled CLI process subscribed to the owned disposable PostgreSQL database,
+accepted SIGTERM, exited 0 and left zero subscription clients and zero HTTP calls.
+Disabled CLI verification proves it needs neither credentials nor a Prisma engine.
+The initial Prisma validation attempt hit a local cache-utime permission error;
+validation passed with both established cached engine paths explicitly supplied.
+These local results do not verify an approved persistent deployment, direct/session
+runtime URL or operator grants. Existing scheduled recovery stays unchanged until
+activation is authorized and proved. T18 remains incomplete; T19 is unstarted.
+
+Current event-delivery API verification passed typecheck/full build on the CI's
+Node 24 runtime with a 4096 MB heap, the staged serverless HTTP/auth/database/font
+smoke at a 1024-descriptor limit, the real Unicode PDF smoke, focused API lint,
+formatting and whitespace checks. The initial Node 20 / 3072 MB bundle attempt
+exhausted its heap after TypeScript passed; it is not a successful build. The
+complete 368-suite API unit result and PR #735 CI above predate this event source;
+fresh aggregate CI is required for this continuation. Self-review inspected each
+changed module, test, migration, manifest and document; no live runtime was enabled.
+
+The event-delivery continuation is preserved in draft
+[PR #737](https://github.com/FSS-Ltd/pathway/pull/737), rebased onto current master
+`c886a54d529c8ced8c5183e7f3ad31208999993b` before publication. The initial source
+head `49b2aa30bc35f89c83ca57c6ef6280ff2c0cfe9f` has CI run40032001845 and
+CodeQL run40031999503 in progress. Pending checks are not passing evidence.
+The checked revision and final results must be refreshed after every push;
+no merge or full T18 completion is claimed.
+
+### T18 hosted Bacs setup correction
+
+Read-only revalidation of all three known synthetic school accounts still found
+charges/payouts disabled and incomplete onboarding. That did not establish that
+every Sandbox Bacs operation was unavailable. A bounded real-adapter probe using
+an existing accepted test mandate created one £1 (100 GBP minor units) direct debit in
+`processing`. Its later provider status was `requires_payment_method`; this is
+not a confirmed receipt or complete cancellation/return assurance. The probe's
+durable operation identity and provider references are retained privately.
+
+The earlier T18 harness attempted direct SetupIntent confirmation, whereas
+[Stripe requires hosted Checkout setup for this Bacs path](https://docs.stripe.com/payments/bacs-debit).
+Exercising the actual hosted adapter exposed HTTP 400 `parameter_unknown` for
+`setup_intent_data[usage]`. Removing that unsupported Checkout override produced
+an open test-mode session restricted to Bacs. After explicit user approval of
+the new fictional payer mandate, in-app-browser submission completed. An
+account-scoped authenticated read verified SetupIntent `succeeded`, usage
+`off_session`, active mandate and matching customer/payment method. Hosted setup
+created no PaymentIntent. No school onboarding password was needed for that
+separate payer flow; school payout readiness remains unverified.
+
+The real return also exposed URL-encoded `{CHECKOUT_SESSION_ID}`. A second
+regression reproduced it. The adapter now serializes the mandate identifier
+before appending Stripe's literal placeholder, matching the existing card flow.
+A fresh unsubmitted test session retained that literal template and was expired
+through the real mandate-servicing adapter. Readback confirmed `expired`, a
+cancelled unsubmitted SetupIntent, no mandate/method and no PaymentIntent. The
+first expiry harness incorrectly expected no SetupIntent at all; that assertion
+failed after expiry. Read-only recovery verified the retained cancelled object
+without creating or expiring another session.
+
+Both product regressions were behaviorally RED; final provider/servicing units
+passed two suites /27 tests. An initial combined command named a nonexistent
+mandate unit file; its nine provider tests passed but the aggregate failed. The
+corrected complete suites are the successful 27-test result. API typecheck/full
+Node 24 build, focused lint and formatting passed. Independent Sol review found
+no P0–P2 issue in the two changed product files. These changes require fresh PR #737
+CI; results on its previous head do not cover this correction. Bacs live stays
+disabled, and T18/T19 completion is not claimed.
+
+**Queued owner request:** Add a Finance setting named “Name on parents' bank
+statements”, with validation and a preview, as a separate focused PR after the
+current PR passes and is confirmed merged. Card statement names and paid Bacs
+Custom Branding must be distinguished. No Bacs branding fee was enabled or
+approved; no implementation of that next change has started.
+
+### T18 real hosted Bacs collection and cancellation recovery
+
+The user-approved fictional normal-bank mandate produced one actual Sandbox
+direct debit for 100 GBP minor units. Genuine signed processing and success
+events passed through the durable inbox, PostgreSQL notification listener and
+canonical worker. Processing retained 100 minor units outstanding with no receipt;
+success produced one receipt, one allocation and zero outstanding. Eight duplicates
+and two additional canonical success replays preserved those counts. The listener
+closed with zero remaining clients. An account-scoped provider read found gross 100,
+processor fee 20 and net 80, with no platform fee or destination charge. The balance
+was pending and payouts were absent; this is not payout reconciliation or live
+capability approval. The shared fixture's old `successDelayed` label does not prove
+the separate three-minute test bank.
+
+A separate owned local database exercised cancellation while one actual £1 debit
+was processing. Canonical cancellation confirmed the mandate cancelled and retained
+the processing attempt, no receipt and 100 minor units outstanding. Interruption
+stopped the original test before its terminal event. Its missing exec handle and
+process inspection
+were checked before recovery; submission was not repeated. An authenticated
+account-scoped read found that same debit succeeded. Existing current-object
+reconciliation captured `API_RECONCILIATION` evidence; committed notification and
+canonical processing produced one receipt/allocation and zero outstanding despite
+cancellation.
+Two additional replays preserved the result. Recovery made zero provider writes.
+This cancellation case proves API recovery, not signed success delivery. Its
+detached payment method must not be reused for future submissions.
+
+Five further canonical hosted setups are prepared for delayed success, delayed
+insufficient funds, delayed debit refusal, dispute and mandate refusal. None has
+been accepted or charged. Automatic approval review blocked navigation because the
+previous approval covered only the earlier specific mandate. A batched confirmation
+for the five explicit fictional test-bank setups remains pending. No browser or
+API workaround bypasses that review. Mandatory asynchronous, payout, private-storage,
+accessibility and remaining family-route assurance stay open; T19 is unstarted.
+
+### T18 PR737 integration-fixture correction
+
+CI run 40034294164 failed on `a38d9ebca7eacdaca328e00bc80fde4f35a2e452`.
+Shard 1 passed 77 suites/500 tests and failed two cases; shard 2 passed 78 suites/399
+tests and failed four cases. Those results do not clear the merge gate.
+
+The listener helper selected a dotenv fallback `TEST_DATABASE_URL` on another
+port, while central global setup bound Prisma to the actual `E2E_DATABASE_URL`.
+A new regression changes that fallback after binding and reproduces the incorrect
+listener destination. The helper now uses the bound `DATABASE_URL`, preserving its
+local disposable-database guard and restricted listener role. Production connection
+and TLS behavior are unchanged.
+
+The principal/fee test also built UTC date filters for a London report. Its
+postings after 23:00 UTC during British Summer Time fell on the next London date
+and were correctly excluded from the old-day report. The test now derives London
+filters spanning the actual invoice/provider posting dates, including midnight
+crossing. Report and ledger calculations are unchanged; all amount assertions remain.
+
+Both defects reproduced behaviorally in the focused Node 24 run: two failed cases,
+one passed. The initial Node 20 compilation was deliberately stopped after stack
+sampling established local memory pressure; it counts as neither RED nor PASS.
+After correction, the complete listener, wakeup, principal/fee and dependency-replay
+database suites passed four suites/ten tests. Formatting and whitespace checks
+passed, as did the API typecheck and focused lint. Fresh current-head CI and
+host-confirmed merge are still required before the queued statement-name setting
+begins. Full T18 completion is not claimed.
+
+The branch was then rebased onto current master
+`0ae915f8c70b258056ec10164fff225da4c3d62a`. All 204 migrations applied to the owned
+review database. Rebased verification passed the same four database suites/ten
+tests, all 24 worker suites/139 tests, API typecheck, focused lint, formatting and
+whitespace checks. No production migration or listener activation occurred.
+
+## T18 continuation: remaining London report fixture
+
+CI run 40041158216 on `97c1d330a6590b903f2c02827f2286d828278598`
+exposed another UTC-based report filter in the signed external-refund assurance
+test. Shard 1 passed 78 suites/502 tests and failed this one case. Its recorded
+failure at 23:58 UTC on 23 October occurred after London had entered 24 October.
+The report correctly excluded the new review case from the previous day's cutoff.
+
+The fixture now uses the existing London calendar helper, spanning the refund's
+provider timestamp through the current London date. All signed-ingress, duplicate,
+recovery, review-case, amount and balance assertions remain. No production report
+or ledger behavior changed. The full signed-ingress and principal/fee database
+suites pass two suites/11 tests; API types, focused lint, formatting and whitespace
+checks pass. Existing London period/projection unit suites pass two suites/10
+tests, including both daylight-saving boundaries. Fresh final-revision CI and
+host-confirmed merge remain required.
+
+Additional native evidence used the existing isolated iPhone 16e/iOS 26.3 component
+harness at a 390-point viewport. The native accessibility tree confirmed font
+scales 1.00 and 2.14. A cold render enlarged the custom fonts and wrapped the top
+invoice content. Native coordinate/scroll input failed in computer use, so full
+enlarged scrolling, control and screen-reader checks remain unproved. The test
+device was restored to 1.00 and shut down; its local server exited successfully.
+The ignored harness resolved an already installed Expo Babel preset explicitly;
+no product dependency changed. This fixture uses mock actions, not authenticated
+Family Space or provider calls.
+
+The user approved all five additional synthetic Bacs mandate setups. Automatic
+browser review nevertheless requires a human final submission; no alternate
+input or API bypass was attempted. The bounded signed-event observer exited
+successfully with five pending setups, no received events and zero debits.
+Actual database/process inspection verified no leftover listener connection or
+observer process. Existing Checkout identities are preserved for the human
+handoff; later recovery must retain its genuine evidence provenance. Full T18
+remains incomplete and T19 has not started.

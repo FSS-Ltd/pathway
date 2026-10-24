@@ -28,6 +28,7 @@ export class HttpFinanceStripeWebhookProcessor implements FinanceStripeWebhookPr
 
   async process(
     event: ClaimedFinanceStripeWebhook,
+    signal?: AbortSignal,
   ): Promise<"processed" | "deferred"> {
     const base = new URL(this.baseUrl);
     if (!base.pathname.endsWith("/")) base.pathname += "/";
@@ -46,7 +47,9 @@ export class HttpFinanceStripeWebhookProcessor implements FinanceStripeWebhookPr
         orgId: event.orgId,
         claimToken: event.claimToken,
       }),
-      signal: AbortSignal.timeout(20_000),
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(20_000)])
+        : AbortSignal.timeout(20_000),
       redirect: "error",
     });
     if (!response.ok) {
