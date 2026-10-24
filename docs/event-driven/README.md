@@ -66,13 +66,17 @@ MessageParticipantReadCursor. They reuse the existing forced-RLS OutboxEvent tab
   outbox worker excludes it, while explicitly typed dispatchers retain their
   current selection behavior. Existing message-email events remain independent.
 
-Capture is disabled unless the backend transaction/database setting
+In step 1.1, capture is disabled unless the backend transaction/database setting
 `app.realtime_capture_enabled` is exactly `on`. Step 1.2 must prove the dedicated
 consumer before activation. This avoids accumulating undeliverable intents between
 separately gated PRs. No historic data is backfilled. Disabling capture preserves
 committed pending intents; it is not permission to delete them. The migration is
 ordered after the repository's existing 20261203 migrations; the filename is not a
 production rollout date.
+
+Step 1.2 replaces that inactive default with a verified commit-coupled private
+Broadcast consumer. See [messaging activation and recovery](MESSAGING-RUNBOOK.md)
+for its provider preflight, request budget and rollout limits.
 
 ## Recovery and activation
 

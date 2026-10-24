@@ -2,153 +2,90 @@
 
 import * as React from "react";
 import {
-  createClient,
-  type RealtimeChannel,
-  type SupabaseClient,
-} from "@supabase/supabase-js";
+  createMessageRealtimeConnection,
+  type MessageRealtimeConnection,
+  type MessageRealtimeStatus,
+} from "@pathway/platform/messaging/realtime-connection";
 import type { MessageRealtimeSubscription } from "@pathway/platform";
 import { issueStaffRealtimeToken } from "@/lib/ace-messaging-api";
 import { issueParentRealtimeToken } from "@/lib/ace-parent-messaging-api";
+import { isMessageAccessDenied } from "./is-message-access-denied";
+import { openMessageRealtimeTransport } from "./message-realtime-transport";
 
-export type MessageRealtimeStatus = "connecting" | "live" | "polling";
+export type { MessageRealtimeStatus } from "@pathway/platform/messaging/realtime-connection";
 
 type RealtimeScope = {
   kind: "staff" | "school-team" | "parent";
+  userId: string;
   conversationId: string | null;
   siteId?: string;
   siteRevision?: number;
-  onInvalidate: () => void;
+  onInvalidate(signal: AbortSignal): Promise<void>;
+  onAccessDenied(): void;
+  onRefreshError(error: unknown): void;
 };
-
-const POLL_INTERVAL_MS = 30_000;
-const TOKEN_REFRESH_BUFFER_MS = 30_000;
 
 export function useMessageRealtime({
   kind,
+  userId,
   conversationId,
   siteId,
   siteRevision,
   onInvalidate,
-}: RealtimeScope): MessageRealtimeStatus {
+  onAccessDenied,
+  onRefreshError,
+}: RealtimeScope): { status: MessageRealtimeStatus; refresh: () => void } {
   const [status, setStatus] =
     React.useState<MessageRealtimeStatus>("connecting");
-  const invalidateRef = React.useRef(onInvalidate);
-  invalidateRef.current = onInvalidate;
+  const connectionRef = React.useRef<MessageRealtimeConnection | null>(null);
+  const handlers = React.useRef({
+    onInvalidate,
+    onAccessDenied,
+    onRefreshError,
+  });
+  handlers.current = { onInvalidate, onAccessDenied, onRefreshError };
 
   React.useEffect(() => {
     if (!conversationId) return;
     const activeConversationId = conversationId;
-    let active = true;
-    let client: SupabaseClient | null = null;
-    let channel: RealtimeChannel | null = null;
-    let renewal: ReturnType<typeof setTimeout> | null = null;
-    let request: AbortController | null = null;
-    let connectionId = 0;
-
-    const invalidate = () => invalidateRef.current();
-    const cleanupChannel = () => {
-      if (client && channel) void client.removeChannel(channel);
-      channel = null;
-      client = null;
+    const start = () => {
+      const connection = createMessageRealtimeConnection({
+        issueSubscription: (signal) =>
+          fetchSubscription(kind, activeConversationId, siteId, signal),
+        openTransport: openMessageRealtimeTransport,
+        onStatus: setStatus,
+        onInvalidate: (signal) => handlers.current.onInvalidate(signal),
+        isAccessDenied: isMessageAccessDenied,
+        onAccessDenied: () => handlers.current.onAccessDenied(),
+        onRefreshError: (error) => handlers.current.onRefreshError(error),
+      });
+      connectionRef.current = connection;
     };
-    const schedule = (delay: number) => {
-      if (renewal) clearTimeout(renewal);
-      renewal = setTimeout(() => void connect(), delay);
+    const foreground = () => {
+      if (document.visibilityState === "hidden") return;
+      if (connectionRef.current) connectionRef.current.foreground();
+      else start();
     };
-
-    async function connect(): Promise<void> {
-      const currentConnection = ++connectionId;
-      request?.abort();
-      cleanupChannel();
-      if (!active) return;
-      setStatus("connecting");
-      const currentRequest = new AbortController();
-      request = currentRequest;
-      try {
-        const subscription = await fetchSubscription(
-          kind,
-          activeConversationId,
-          siteId,
-          currentRequest.signal,
-        );
-        if (
-          !active ||
-          currentRequest.signal.aborted ||
-          currentConnection !== connectionId
-        )
-          return;
-        client = createClient(subscription.url, subscription.publishableKey, {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false,
-          },
-        });
-        client.realtime.setAuth(subscription.token);
-        channel = client.channel(subscription.topic, {
-          config: { private: true },
-        });
-        schedule(
-          Math.max(
-            5_000,
-            Date.parse(subscription.expiresAt) -
-              Date.now() -
-              TOKEN_REFRESH_BUFFER_MS,
-          ),
-        );
-        channel
-          .on("broadcast", { event: "message.created" }, invalidate)
-          .on("broadcast", { event: "conversation.read" }, invalidate)
-          .subscribe((state) => {
-            if (!active || currentConnection !== connectionId) return;
-            if (state === "SUBSCRIBED") {
-              setStatus("live");
-              invalidate();
-            } else if (
-              state === "CHANNEL_ERROR" ||
-              state === "TIMED_OUT" ||
-              state === "CLOSED"
-            ) {
-              setStatus("polling");
-              invalidate();
-              schedule(POLL_INTERVAL_MS);
-            }
-          });
-      } catch {
-        if (
-          !active ||
-          currentRequest.signal.aborted ||
-          currentConnection !== connectionId
-        )
-          return;
-        setStatus("polling");
-        schedule(POLL_INTERVAL_MS);
-      }
-    }
-
-    const onFocus = () => invalidate();
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") invalidate();
+    const visibility = () => {
+      if (document.visibilityState === "hidden") {
+        connectionRef.current?.stop();
+        connectionRef.current = null;
+        setStatus("disconnected");
+      } else foreground();
     };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-    const polling = setInterval(() => {
-      if (document.visibilityState === "visible") invalidate();
-    }, POLL_INTERVAL_MS);
-    void connect();
+    window.addEventListener("focus", foreground);
+    document.addEventListener("visibilitychange", visibility);
+    if (document.visibilityState !== "hidden") start();
     return () => {
-      active = false;
-      connectionId += 1;
-      request?.abort();
-      if (renewal) clearTimeout(renewal);
-      clearInterval(polling);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
-      cleanupChannel();
+      connectionRef.current?.stop();
+      connectionRef.current = null;
+      window.removeEventListener("focus", foreground);
+      document.removeEventListener("visibilitychange", visibility);
     };
-  }, [kind, conversationId, siteId, siteRevision]);
+  }, [kind, userId, conversationId, siteId, siteRevision]);
 
-  return status;
+  const refresh = React.useCallback(() => connectionRef.current?.refresh(), []);
+  return { status, refresh };
 }
 
 function fetchSubscription(

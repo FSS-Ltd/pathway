@@ -266,6 +266,17 @@ async function run(): Promise<void> {
     assert.match(container.textContent ?? "", /Welcome/);
     assert.match(container.textContent ?? "", /How are you\?/);
     assert.match(container.textContent ?? "", /Good morning/);
+    assert.match(container.textContent ?? "", /Disconnected/);
+    const refreshMessages = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent === "Refresh messages");
+    assert.ok(
+      refreshMessages,
+      "disconnected readers can explicitly refresh messages",
+    );
+    const readsBeforeRefresh = threadReads;
+    await act(async () => refreshMessages.click());
+    assert.equal(threadReads, readsBeforeRefresh + 1);
     assert.match(container.querySelector("ol")?.textContent ?? "", /Read/);
     assert.equal(
       container.querySelectorAll('ol[aria-live="polite"] li').length,
@@ -512,7 +523,7 @@ async function run(): Promise<void> {
     assert.match(container.textContent ?? "", /Conversation unavailable/);
     assert.doesNotMatch(
       container.textContent ?? "",
-      /Live updates|Connecting updates|Refreshing automatically/,
+      /Live updates|Connecting updates|Disconnected/,
     );
     const readsAfterDenial = threadReads;
     await act(async () => window.dispatchEvent(new dom.window.Event("focus")));

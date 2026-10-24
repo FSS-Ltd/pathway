@@ -30,7 +30,6 @@ export function useParentMessaging(siteId: string, userId: string) {
   const [threadAccessLost, setThreadAccessLost] = React.useState(false);
   const [sendAccessLost, setSendAccessLost] = React.useState(false);
   const [threadMoreLoading, setThreadMoreLoading] = React.useState(false);
-  const [threadRevision, setThreadRevision] = React.useState(0);
   const [draft, setDraft] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [sendError, setSendError] = React.useState<string | null>(null);
@@ -47,143 +46,181 @@ export function useParentMessaging(siteId: string, userId: string) {
   messagesRef.current = messages;
   nextMessageCursorRef.current = nextMessageCursor;
   const identityRef = React.useRef<string | null>(null);
-  const realtimeStatus = useMessageRealtime({
+  const listRefreshRef = React.useRef<(signal?: AbortSignal) => Promise<void>>(
+    async () => {},
+  );
+  const threadRefreshRef = React.useRef<
+    (signal?: AbortSignal) => Promise<void>
+  >(async () => {});
+  const realtime = useMessageRealtime({
+    userId,
     kind: "parent",
     conversationId: threadAccessLost ? null : (conversation?.id ?? null),
     siteId,
-    onInvalidate: () => {
-      setListRevision((revision) => revision + 1);
-      setThreadRevision((revision) => revision + 1);
+    onInvalidate: async (signal) => {
+      await Promise.all([
+        listRefreshRef.current(signal),
+        threadRefreshRef.current(signal),
+      ]);
     },
+    onAccessDenied: denyThreadAccess,
+    onRefreshError: (error) =>
+      setThreadError(requestFailure(error, "Unable to load messages.").message),
   });
 
   React.useEffect(() => {
     const current = ++generation.current;
-    const controller = new AbortController();
-    setListLoading(true);
-    setListError(null);
-    const identity = `${siteId}:${userId}`;
-    if (identityRef.current !== identity) {
-      identityRef.current = identity;
-      setConversation(null);
-      setMessages([]);
-      messagesRef.current = [];
-      nextMessageCursorRef.current = null;
-      setDraft("");
-      setThreadAccessLost(false);
-      setSendAccessLost(false);
-      deniedConversationId.current = null;
-      requestId.current = null;
-      lastReadAttempt.current = null;
-    }
-    void fetchParentConversation(siteId, controller.signal)
-      .then((item) => {
-        if (current === generation.current) {
-          setConversation(
-            item?.id === deniedConversationId.current
-              ? { ...item, latestMessage: null, unreadCount: 0 }
-              : item,
-          );
-        }
-      })
-      .catch((error: unknown) => {
-        if (current !== generation.current || controller.signal.aborted) return;
-        setListError(
-          requestFailure(error, "Your school messages could not be loaded.")
-            .message,
-        );
+    let request: AbortController | undefined;
+    const refresh = (incomingSignal?: AbortSignal): Promise<void> => {
+      request?.abort();
+      const controller = new AbortController();
+      request = controller;
+      const signal = incomingSignal
+        ? AbortSignal.any([incomingSignal, controller.signal])
+        : controller.signal;
+      if (!incomingSignal) setListLoading(true);
+      setListError(null);
+      const identity = `${siteId}:${userId}`;
+      if (identityRef.current !== identity) {
+        identityRef.current = identity;
         setConversation(null);
         setMessages([]);
         messagesRef.current = [];
         nextMessageCursorRef.current = null;
-      })
-      .finally(() => {
-        if (current === generation.current) setListLoading(false);
-      });
+        setDraft("");
+        setThreadAccessLost(false);
+        setSendAccessLost(false);
+        deniedConversationId.current = null;
+        requestId.current = null;
+        lastReadAttempt.current = null;
+      }
+      return fetchParentConversation(siteId, signal)
+        .then((item) => {
+          if (current === generation.current && !signal.aborted) {
+            setConversation(
+              item?.id === deniedConversationId.current
+                ? { ...item, latestMessage: null, unreadCount: 0 }
+                : item,
+            );
+          }
+        })
+        .catch((error: unknown) => {
+          if (current !== generation.current || signal.aborted) return;
+          setListError(
+            requestFailure(error, "Your school messages could not be loaded.")
+              .message,
+          );
+          setConversation(null);
+          setMessages([]);
+          messagesRef.current = [];
+          nextMessageCursorRef.current = null;
+        })
+        .finally(() => {
+          if (current === generation.current && !signal.aborted)
+            setListLoading(false);
+        });
+    };
+    listRefreshRef.current = refresh;
+    void refresh();
     return () => {
       generation.current += 1;
-      controller.abort();
+      request?.abort();
+      listRefreshRef.current = async () => {};
     };
   }, [siteId, userId, listRevision]);
 
   const conversationId = conversation?.id;
   React.useEffect(() => {
-    const current = ++threadGeneration.current;
-    if (!conversationId) return;
-    const controller = new AbortController();
-    setThreadLoading(true);
-    setThreadError(null);
-    void fetchParentMessages(siteId, conversationId, {
-      signal: controller.signal,
-    })
-      .then((page) => {
-        if (current !== threadGeneration.current) return;
-        const latest = page.items
-          .slice()
-          .reverse()
-          .map((item) => normalizeParentMessage(item, userId));
-        const merged = mergeMessageHistory(
-          messagesRef.current,
-          latest,
-          nextMessageCursorRef.current,
-          page.nextCursor,
-        );
-        messagesRef.current = merged.messages;
-        nextMessageCursorRef.current = merged.nextCursor;
-        setMessages(merged.messages);
-        setNextMessageCursor(merged.nextCursor);
-        if (deniedConversationId.current === conversationId) {
-          deniedConversationId.current = null;
-          setListRevision((value) => value + 1);
-        }
-        setThreadAccessLost(false);
-        const newest = page.items[0];
-        if (
-          newest &&
-          (lastReadAttempt.current?.conversationId !== conversationId ||
-            newest.sequence > lastReadAttempt.current.sequence)
-        ) {
-          lastReadAttempt.current = {
-            conversationId,
-            sequence: newest.sequence,
-          };
-          void advanceParentReadCursor(
-            siteId,
-            conversationId,
-            newest.sequence,
-          ).catch((error: unknown) => {
-            if (current === threadGeneration.current) {
-              if (isMessageAccessDenied(error)) {
-                denyThreadAccess();
-                return;
+    if (!conversationId) {
+      setThreadLoading(false);
+      return;
+    }
+    if (deniedConversationId.current !== conversationId) setThreadLoading(true);
+    let request: AbortController | undefined;
+    const refresh = (incomingSignal?: AbortSignal): Promise<void> => {
+      request?.abort();
+      const current = ++threadGeneration.current;
+      const controller = new AbortController();
+      request = controller;
+      const signal = incomingSignal
+        ? AbortSignal.any([incomingSignal, controller.signal])
+        : controller.signal;
+      setThreadLoading(true);
+      setThreadError(null);
+      return fetchParentMessages(siteId, conversationId, {
+        signal,
+      })
+        .then((page) => {
+          if (current !== threadGeneration.current || signal.aborted) return;
+          const latest = page.items
+            .slice()
+            .reverse()
+            .map((item) => normalizeParentMessage(item, userId));
+          const merged = mergeMessageHistory(
+            messagesRef.current,
+            latest,
+            nextMessageCursorRef.current,
+            page.nextCursor,
+          );
+          messagesRef.current = merged.messages;
+          nextMessageCursorRef.current = merged.nextCursor;
+          setMessages(merged.messages);
+          setNextMessageCursor(merged.nextCursor);
+          if (deniedConversationId.current === conversationId) {
+            deniedConversationId.current = null;
+            setListRevision((value) => value + 1);
+          }
+          setThreadAccessLost(false);
+          const newest = page.items[0];
+          if (
+            newest &&
+            (lastReadAttempt.current?.conversationId !== conversationId ||
+              newest.sequence > lastReadAttempt.current.sequence)
+          ) {
+            lastReadAttempt.current = {
+              conversationId,
+              sequence: newest.sequence,
+            };
+            void advanceParentReadCursor(
+              siteId,
+              conversationId,
+              newest.sequence,
+            ).catch((error: unknown) => {
+              if (current === threadGeneration.current) {
+                if (isMessageAccessDenied(error)) {
+                  denyThreadAccess();
+                  return;
+                }
+                lastReadAttempt.current = null;
+                setThreadError(
+                  "Messages loaded, but read status could not be saved.",
+                );
               }
-              lastReadAttempt.current = null;
-              setThreadError(
-                "Messages loaded, but read status could not be saved.",
-              );
-            }
-          });
-        }
-      })
-      .catch((error: unknown) => {
-        if (current !== threadGeneration.current || controller.signal.aborted)
-          return;
-        if (isMessageAccessDenied(error)) {
-          denyThreadAccess();
-          return;
-        }
-        setThreadError(
-          requestFailure(error, "Unable to load messages.").message,
-        );
-      })
-      .finally(() => {
-        if (current === threadGeneration.current) setThreadLoading(false);
-      });
+            });
+          }
+        })
+        .catch((error: unknown) => {
+          if (current !== threadGeneration.current || signal.aborted) return;
+          if (isMessageAccessDenied(error)) {
+            denyThreadAccess();
+            return;
+          }
+          setThreadError(
+            requestFailure(error, "Unable to load messages.").message,
+          );
+        })
+        .finally(() => {
+          if (current === threadGeneration.current && !signal.aborted)
+            setThreadLoading(false);
+        });
+    };
+    threadRefreshRef.current = refresh;
     return () => {
       threadGeneration.current += 1;
-      controller.abort();
+      request?.abort();
+      threadRefreshRef.current = async () => {};
     };
-  }, [siteId, userId, conversationId, threadRevision]);
+  }, [siteId, userId, conversationId]);
 
   async function open(recipientUserId: string): Promise<boolean> {
     const current = generation.current;
@@ -323,7 +360,7 @@ export function useParentMessaging(siteId: string, userId: string) {
   }
 
   return {
-    realtimeStatus,
+    realtimeStatus: realtime.status,
     conversation,
     listLoading,
     listError,
@@ -336,7 +373,10 @@ export function useParentMessaging(siteId: string, userId: string) {
     threadAccessLost,
     sendAccessLost,
     threadMoreLoading,
-    retryThread: () => setThreadRevision((value) => value + 1),
+    retryThread: () => {
+      if (threadAccessLost) void threadRefreshRef.current();
+      else realtime.refresh();
+    },
     loadOlderMessages,
     draft,
     sending,

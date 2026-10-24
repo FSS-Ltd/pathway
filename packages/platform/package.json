@@ -11,7 +11,8 @@
     "./capability-maps": "./src/capability-maps.ts",
     "./access-tags": "./src/access-tags.ts",
     "./finance-currencies": "./src/finance-currencies.ts",
-    "./finance-collection-amount": "./src/finance-collection-amount.ts"
+    "./finance-collection-amount": "./src/finance-collection-amount.ts",
+    "./messaging/realtime-connection": "./src/messaging/message-realtime-connection.ts"
   },
   "scripts": {
     "build": "echo platform-build",

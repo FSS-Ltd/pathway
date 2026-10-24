@@ -66,7 +66,7 @@ export function StaffMessagingWorkspace({
         </p>
       ) : null}
       <StaffConversationPane
-        key={selectedChannel}
+        key={`${currentUserId}:${selectedChannel}`}
         channel={selectedChannel}
         currentUserId={currentUserId}
         canSend={canSend}

@@ -65,6 +65,7 @@
     "@jest/test-sequencer": "^29.7.0",
     "@nestjs/testing": "^11.1.6",
     "@prisma/client": "^5.18.0",
+    "@supabase/supabase-js": "^2.117.3",
     "@types/archiver": "7.0.0",
     "@types/cookie-parser": "^1.4.7",
     "@types/express": "^4.17.21",

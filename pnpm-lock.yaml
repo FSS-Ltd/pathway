@@ -278,6 +278,9 @@ importers:
       '@prisma/client':
         specifier: ^5.18.0
         version: 5.22.0(prisma@5.22.0)
+      '@supabase/supabase-js':
+        specifier: ^2.117.3
+        version: 2.117.3
       '@types/archiver':
         specifier: 7.0.0
         version: 7.0.0

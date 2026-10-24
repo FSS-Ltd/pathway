@@ -4,13 +4,13 @@ Approved plan: [Event-driven updates and worker wakeups](README.md).
 Base: FSS-Ltd/pathway `master`; step 1.1 starts at
 `82770da7fd836d031c2e3ed76f127e5c723a5249` (PR #734 merged).
 
-| Step | State                        | PR / evidence                                                            | Next permitted action                                          |
-| ---- | ---------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| 1.1  | PR open; review fix verified | [#736](https://github.com/FSS-Ltd/pathway/pull/736); local checks passed | Verify latest-head CI; obtain production merge authorization   |
-| 1.2  | Planned                      | No implementation started                                                | Wait for 1.1 PR, current-revision green CI and confirmed merge |
-| 1.3  | Planned                      | No implementation started                                                | Wait for 1.2 gate                                              |
-| 1.4  | Planned                      | No implementation started                                                | Wait for 1.3 gate                                              |
-| 1.5  | Planned                      | No implementation started                                                | Wait for 1.4 gate                                              |
+| Step | State       | PR / evidence                                                                                                | Next permitted action                                                   |
+| ---- | ----------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| 1.1  | Merged      | [#736](https://github.com/FSS-Ltd/pathway/pull/736), merge `0ae915f8`; all 12 current-revision checks passed | Observe authorized deployment; capture remains off                      |
+| 1.2  | In progress | [PR #739](https://github.com/FSS-Ltd/pathway/pull/739), branch `build/event-driven-1-2`                      | Finish verification/review; require current CI, authorization and merge |
+| 1.3  | Planned     | No implementation started                                                                                    | Wait for 1.2 gate                                                       |
+| 1.4  | Planned     | No implementation started                                                                                    | Wait for 1.3 gate                                                       |
+| 1.5  | Planned     | No implementation started                                                                                    | Wait for 1.4 gate                                                       |
 
 ## Step 1.1 decisions and evidence
 
@@ -60,3 +60,59 @@ record. Do not mark this step complete from local checks or a pushed branch alon
   outside this review; it has not been implemented or claimed complete.
 - Latest pushed revision, CI results and merge state are recorded in PR #736's
   delivery record. Step 1.2 remains gated until current-revision CI and merge.
+
+## Step 1.1 merge evidence
+
+- User authorized merge and its production deployment after passing CI.
+- Checked head: `fc9acaefbfc911a67b51237dc3d258db47f7f220`; [CI](https://github.com/FSS-Ltd/pathway/actions/runs/40030912057) and all 12 checks passed.
+- Verified hosted merge at `2026-10-23T22:42:13Z`: `0ae915f8c70b258056ec10164fff225da4c3d62a`.
+- Tested merge `a1724431` and actual merge have identical tree `89eee1e4289dba3ed6a3d839ff7ad66cadc5b10e`.
+- [Deployment](https://github.com/FSS-Ltd/pathway/actions/runs/40035308020): all migration, web, admin and API deployment jobs passed.
+- The isolated checkout is reused for the active next step; original user changes remain untouched.
+
+## Step 1.2 implementation verification (not merged)
+
+- [Draft PR #739](https://github.com/FSS-Ltd/pathway/pull/739) implements messaging
+  conversion. No 1.3 work has started; current CI, review, production authorization
+  and confirmed merge remain required before progression.
+- Private user/site inbox invalidations commit with source mutations and durable
+  outbox intent. Signed anchor claims retain existing join checks; publication
+  rechecks each source's current recipients, including other conversations.
+- Final local API units: all 367 discovered files covered exactly once across
+  four bounded shards, 2,462 passed, none failed/skipped. The initial single-process
+  run exhausted its heap; bounded shards resolved the local resource limit.
+- Platform: 249 passed, five pre-existing skipped. Database: 96 passed,
+  33 pre-existing skipped. Full browser units, API/admin/platform typechecks,
+  targeted lint and current API/serverless/admin builds passed.
+- Actual Supabase provider: all 15 cases passed, covering commit/rollback, read
+  cursors, duplicates, strict queue errors, forced RLS, signed-scope isolation,
+  revocation, off-screen inbox updates, renewals and transport recovery. Added
+  tag-only responder join/delivery/revocation and guardian eligibility checks for
+  both live delivery and pending-intent reconciliation.
+- HTTP family security: 15 passed. Verification also ran without ambient local
+  environment files, which were restored afterward. Open-handle detection in
+  [Node 24 provider CI](https://github.com/FSS-Ltd/pathway/actions/runs/40049672666)
+  passed and exited normally; the earlier pooled-worker exit warning did not recur.
+- ECR's shared anonymous download quota initially blocked CI before tests. The
+  fixture now uses verified official Docker Hub releases and can reuse same-version
+  cached CLI images locally. No provider version or runtime event service changed.
+- Upstream #737 has all 12 checks green and is confirmed merged at `85d449db`.
+  Integrated it in `a1cfa3ba`; current verification includes that finance base.
+- [Activation and recovery runbook](MESSAGING-RUNBOOK.md) records migration impact,
+  provider versions and hosted restart/upgrade verification limits. Production
+  merge/activation authorization is still required for this step.
+
+- Independent whole-branch review completed for `85d449db..b2a52b3e`. The guardian
+  eligibility finding reproduced a two-row metadata leak before the shared ACL
+  fix; all 15 provider cases and 15 HTTP security cases then passed. The tag-key
+  finding was rejected after checking Prisma's enum mapping and proving actual
+  tag-only behavior. Review decisions and limits are recorded in STEP-1-2.md.
+- The final ACL-fix revision still needs current-revision CI and separate merge/
+  deployment authorization. No later delivery step has started.
+
+- Read-only production metadata preflight passed with verified TLS: queue columns/
+  defaults and migration-role INSERT privileges are compatible; existing ACE
+  private-topic policies use the authorizer. Bounded discovery found zero pending
+  realtime intents. Public core/identity/outbox plus partial app bridge views are
+  recorded in the runbook. Exact-layout local authorization and durable publication
+  passed inside a rolled-back transaction, including the public outbox trigger path.

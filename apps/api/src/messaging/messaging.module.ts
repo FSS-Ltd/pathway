@@ -16,7 +16,6 @@ import { MessagingBoundaryAuditInterceptor } from "./messaging-boundary-audit.in
 import { MessagingCommandService } from "./messaging-command.service";
 import { MessagingConversationService } from "./messaging-conversation.service";
 import { MessagingService } from "./messaging.service";
-import { MessageRealtimePublisher } from "./message-realtime.publisher";
 import { ParentMessagingController } from "./parent-messaging.controller";
 import { ParentMessagingCommandService } from "./parent-messaging-command.service";
 import { ParentMessagingConversationService } from "./parent-messaging-conversation.service";
@@ -62,7 +61,6 @@ import { RealtimeTokenService } from "../realtime/realtime-token.service";
     ParentMessagingHistoryService,
     ParentMessagingReadCursorService,
     RealtimeTokenService,
-    MessageRealtimePublisher,
   ],
   exports: [ParentMessagingService],
 })
