@@ -1,12 +1,20 @@
 import { providerUrl } from "./environment";
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import { test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import { createMessageRealtimeConnection } from "@pathway/platform/messaging/realtime-connection";
-import { openMessageRealtimeTransport } from "../../../admin/components/ace/messaging/message-realtime-transport";
 import { RealtimeTokenService } from "../../src/realtime/realtime-token.service";
 import { MessagingService } from "../../src/messaging/messaging.service";
 import { asWriter, conversationId, sender } from "./fixture";
+
+// The admin package is CommonJS to Node. Load its actual browser transport
+// through Node's CJS bridge so the provider proof works on Node 22 and 24.
+const browserTransport: typeof import("../../../admin/components/ace/messaging/message-realtime-transport") =
+  createRequire(import.meta.url)(
+    "../../../admin/components/ace/messaging/message-realtime-transport.ts",
+  );
+const { openMessageRealtimeTransport } = browserTransport;
 
 export async function waitUntil(
   predicate: () => boolean,
