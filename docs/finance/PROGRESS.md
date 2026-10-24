@@ -708,3 +708,18 @@ Database, Organisation Role RLS and CodeQL. No blocking review decision was reco
 This clears the storage and PDF continuation's delivery gate. Full T18 remains incomplete
 (hosted Bacs outcomes, Sandbox payouts, tagged PDF and VoiceOver, hosted storage ACL,
 persistent-host listener) and T19 has not started.
+
+## T19 go-live readiness (prepared, not started)
+
+Branch `docs/finance-t19-pilot-readiness`. The go-live design
+([t19-go-live-readiness.md](t19-go-live-readiness.md)) and a first-payments runbook
+([first-payments-reconciliation.md](runbooks/first-payments-reconciliation.md)) cover every school
+that buys Finance. No pilot school or extra caps are required; the product's own limits apply.
+No live setting was changed and no real payment was taken.
+
+- Card: live collection is configuration only, after seven platform gates (P1 to P7).
+- Bacs: the provider is bound to test mode and rejects live responses, and the collection job
+  refuses to run outside test mode. Live Bacs needs its own reviewed code change.
+- Pause is `FINANCE_STRIPE_LIVE_ENABLED=false` plus a redeploy; servicing stays on.
+
+Switching live collection on is the owner's decision.
