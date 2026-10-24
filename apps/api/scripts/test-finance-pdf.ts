@@ -44,3 +44,9 @@ for (const character of Array.from(new Set(payerName))) {
     `Finance PDF lost the payer name character ${character}`,
   );
 }
+
+// Screen readers need a document language and a title shown by the viewer.
+// The renderer's labels are English, so the declared language must be too.
+const raw = pdf.toString("latin1");
+assert.match(raw, /\/Lang \(en-GB\)/, "Finance PDF must declare its language");
+assert.match(raw, /\/DisplayDocTitle true/, "Finance PDF must show its title");

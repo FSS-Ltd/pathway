@@ -266,3 +266,60 @@ describe("create-only private Finance uploads", () => {
     );
   });
 });
+
+describe("missing private Finance objects", () => {
+  const originalEnv = { ...process.env };
+  const key = financeDocumentStorageKey(
+    "tenant_1",
+    "invoice",
+    "04b7d8c4-c891-4af8-9011-d5a403ce3296",
+  );
+  beforeEach(() => {
+    process.env.SUPABASE_URL = "https://project.supabase.co";
+    process.env.SUPABASE_SECRET_KEY = "server-secret";
+    process.env.SUPABASE_STORAGE_PRIVATE_BUCKET = "private-bucket";
+    process.env.SUPABASE_STORAGE_PUBLIC_BUCKET = "public-bucket";
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    process.env = { ...originalEnv };
+  });
+
+  it.each([
+    { status: 404, payload: { error: "not_found" } },
+    {
+      // Observed from Storage API v1.70.3: HTTP 400 with an embedded 404.
+      status: 400,
+      payload: {
+        statusCode: "404",
+        error: "not_found",
+        message: "Object not found",
+        code: "NoSuchKey",
+      },
+    },
+  ])("reads a missing object as absent for HTTP $status", async (response) => {
+    jest
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        Response.json(response.payload, { status: response.status }),
+      );
+    await expect(
+      new SupabaseStorageService().downloadObject("private-bucket", key),
+    ).resolves.toBeNull();
+  });
+
+  it.each([
+    { status: 400, payload: { statusCode: "400", error: "InvalidKey" } },
+    { status: 403, payload: { statusCode: "403", error: "Unauthorized" } },
+    { status: 500, payload: { statusCode: "404", error: "not_found" } },
+  ])("still fails closed for HTTP $status", async (response) => {
+    jest
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        Response.json(response.payload, { status: response.status }),
+      );
+    await expect(
+      new SupabaseStorageService().downloadObject("private-bucket", key),
+    ).rejects.toThrow("Supabase Storage download failed");
+  });
+});

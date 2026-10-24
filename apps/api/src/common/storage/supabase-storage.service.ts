@@ -119,6 +119,7 @@ export class SupabaseStorageService {
     if (response.status === 404) return null;
     if (!response.ok) {
       const message = await this.safeResponseText(response);
+      if (isMissingObjectResponse(response.status, message)) return null;
       this.logger.error({
         message: "Supabase Storage download failed",
         status: response.status,
@@ -226,6 +227,22 @@ function isExistingObjectResponse(status: number, body: string): boolean {
     code === "already_exists" ||
     error === "Duplicate"
   );
+}
+
+/** Some Storage API versions report a missing object as HTTP 400 with a 404 body. */
+function isMissingObjectResponse(status: number, body: string): boolean {
+  if (status !== 400) return false;
+  try {
+    const payload: unknown = JSON.parse(body);
+    return (
+      typeof payload === "object" &&
+      payload !== null &&
+      "statusCode" in payload &&
+      String(payload.statusCode) === "404"
+    );
+  } catch {
+    return false;
+  }
 }
 
 function encodeStorageKey(key: string): string {
