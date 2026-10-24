@@ -4,13 +4,13 @@ Approved plan: [Event-driven updates and worker wakeups](README.md).
 Base: FSS-Ltd/pathway `master`; step 1.1 starts at
 `82770da7fd836d031c2e3ed76f127e5c723a5249` (PR #734 merged).
 
-| Step | State       | PR / evidence                                                                                                | Next permitted action                                       |
-| ---- | ----------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| 1.1  | Merged      | [#736](https://github.com/FSS-Ltd/pathway/pull/736), merge `0ae915f8`; all 12 current-revision checks passed | Observe authorized deployment; capture remains off          |
-| 1.2  | In progress | Branch `build/event-driven-1-2`, base `0ae915f8`                                                             | Implement and verify messaging conversion; raise its own PR |
-| 1.3  | Planned     | No implementation started                                                                                    | Wait for 1.2 gate                                           |
-| 1.4  | Planned     | No implementation started                                                                                    | Wait for 1.3 gate                                           |
-| 1.5  | Planned     | No implementation started                                                                                    | Wait for 1.4 gate                                           |
+| Step | State       | PR / evidence                                                                                                | Next permitted action                                                   |
+| ---- | ----------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| 1.1  | Merged      | [#736](https://github.com/FSS-Ltd/pathway/pull/736), merge `0ae915f8`; all 12 current-revision checks passed | Observe authorized deployment; capture remains off                      |
+| 1.2  | In progress | [PR #739](https://github.com/FSS-Ltd/pathway/pull/739), branch `build/event-driven-1-2`                      | Finish verification/review; require current CI, authorization and merge |
+| 1.3  | Planned     | No implementation started                                                                                    | Wait for 1.2 gate                                                       |
+| 1.4  | Planned     | No implementation started                                                                                    | Wait for 1.3 gate                                                       |
+| 1.5  | Planned     | No implementation started                                                                                    | Wait for 1.4 gate                                                       |
 
 ## Step 1.1 decisions and evidence
 
@@ -72,23 +72,30 @@ record. Do not mark this step complete from local checks or a pushed branch alon
 
 ## Step 1.2 implementation verification (not merged)
 
-- Replaced recurring messaging reads with an explicit subscription lifecycle,
-  in-place authentication renewal, bounded reconnect and manual refresh.
-- Durable private user/site inbox invalidations commit with source mutations;
-  authorized anchor claims preserve existing join permission checks. Current
-  recipients are rechecked for each publication, including other conversations.
-- Local Supabase provider: all 11 cases passed, including read cursors, rollback,
-  strict queue failure, duplicate delivery, forced RLS, signed-scope isolation,
-  revocation, off-screen inbox updates, token renewal and transport recovery.
+- [Draft PR #739](https://github.com/FSS-Ltd/pathway/pull/739) implements messaging
+  conversion. No 1.3 work has started; current CI, review, production authorization
+  and confirmed merge remain required before progression.
+- Private user/site inbox invalidations commit with source mutations and durable
+  outbox intent. Signed anchor claims retain existing join checks; publication
+  rechecks each source's current recipients, including other conversations.
+- Final local API units: all 367 discovered files covered exactly once across
+  four bounded shards, 2,462 passed, none failed/skipped. The initial single-process
+  run exhausted its heap; bounded shards resolved the local resource limit.
 - Platform: 249 passed, five pre-existing skipped. Database: 96 passed,
-  33 pre-existing skipped. Browser unit suite and configured build passed before
-  the final inbox-topic contract update; final checks are still in progress.
-- Full API unit attempt exhausted Node's heap; a recyclable-worker attempt was
-  stopped due repeated compiler reloads. Run four bounded shards for full coverage.
-  HTTP security verification, current builds and review remain pending.
+  33 pre-existing skipped. Full browser units, API/admin/platform typechecks,
+  targeted lint and current API/serverless/admin builds passed.
+- Actual Supabase provider: all 11 cases passed, covering commit/rollback, read
+  cursors, duplicates, strict queue errors, forced RLS, signed-scope isolation,
+  revocation, off-screen inbox updates, renewals and transport recovery.
+- HTTP family security: 15 passed. Verification also ran without ambient local
+  environment files, which were restored afterward. Open-handle detection in
+  [Node 24 provider CI](https://github.com/FSS-Ltd/pathway/actions/runs/40049672666)
+  passed and exited normally; the earlier pooled-worker exit warning did not recur.
+- ECR's shared anonymous download quota initially blocked CI before tests. The
+  fixture now uses verified official Docker Hub releases and can reuse same-version
+  cached CLI images locally. No provider version or runtime event service changed.
 - Upstream #737 has all 12 checks green and is confirmed merged at `85d449db`.
-  Integrated it without rewriting shared history in `a1cfa3ba`; final verification
-  uses that updated base. No next-step work started.
+  Integrated it in `a1cfa3ba`; current verification includes that finance base.
 - [Activation and recovery runbook](MESSAGING-RUNBOOK.md) records migration impact,
   provider versions and hosted restart/upgrade verification limits. Production
   merge/activation authorization is still required for this step.
