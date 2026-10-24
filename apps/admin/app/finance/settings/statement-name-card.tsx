@@ -184,7 +184,7 @@ export function StatementNameCard({ canManage }: { canManage: boolean }) {
                     </Button>
                     <Button
                       asChild
-                      className="h-auto min-h-10 min-w-0 max-w-full whitespace-normal px-3 py-2 text-center"
+                      className="h-auto min-h-10 min-w-0 max-w-full whitespace-normal px-3 py-2 text-center hover:text-accent-foreground"
                     >
                       <a
                         href="https://dashboard.stripe.com/settings/business-details"

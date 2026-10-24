@@ -637,3 +637,10 @@ unproved. No production deployment, migration or subscription charge occurred.
 PR creation, fresh current-revision CI and merge remain pending. Full T18 remains
 incomplete and T19 has not started. No subsequent implementation step may begin
 until this standalone change satisfies its PR/CI/merge gate.
+
+PR #740 follow-up review found that the global `a:hover` colour could override
+the new primary handoff link. A component-scoped hover token preserves readable
+text. Actual in-app browser pointer hover confirmed foreground `rgb(15,23,42)`
+on background `rgb(15,157,130)`, contrast 5.24:1 (WCAG relative luminance).
+No provider navigation or submission occurred. The updated revision requires
+fresh CI before merge; results from the previous head cannot satisfy its gate.
