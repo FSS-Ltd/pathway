@@ -34,9 +34,11 @@ provider upgrades. Hosted Supabase ownership/privileges must permit the migratio
 role to insert private Broadcast rows. A failure aborts the migration or write;
 never bypass it by marking intents dispatched manually.
 
-The trigger function's `app.realtime_capture_default` is `on` where the provider
-queue exists at installation, otherwise `off` for plain PostgreSQL test databases.
-This function setting takes effect for existing application pools immediately.
+The default comes from the function `app.realtime_capture_default()`: `on` where the
+provider queue exists at installation, otherwise `off` for plain PostgreSQL test
+databases. It is a function rather than a database parameter because hosted Supabase
+denies the migration role `ALTER FUNCTION ... SET` for custom parameters. Replacing it
+takes effect for existing application pools immediately.
 An explicit transaction/connection `app.realtime_capture_enabled=off` override
 is reserved for controlled maintenance. Disabling capture while clients use
 subscriptions leaves them dependent on manual/foreground/reconnect reconciliation.
