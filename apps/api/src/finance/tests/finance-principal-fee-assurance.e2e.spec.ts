@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { withTenantRlsContext } from "@pathway/db";
 import { requireDatabase } from "../../../test-helpers.e2e";
 import { FinanceReportRepository } from "../finance-report.repository";
+import { financeLocalDateKey } from "../finance-report-projection";
 import { captureFinanceSettlementObservation } from "../reconciliation/finance-settlement.persistence";
 import { FinanceSettlementReportRepository } from "../reconciliation/finance-settlement-report.repository";
 import { createFinanceAssuranceFixture } from "./finance-assurance.fixture";
@@ -130,7 +131,7 @@ describe("Finance principal and processor fee assurance", () => {
         }),
       ).toEqual([{ amountMinor: 30000n }]);
     });
-    const day = now.toISOString().slice(0, 10);
+    const day = financeLocalDateKey(now);
     const filters = { from: day, to: day, asOf: day };
     const family = await new FinanceReportRepository(f.balances).loadSnapshot(
       f.actor,
