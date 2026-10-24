@@ -95,3 +95,8 @@ retry only through the existing idempotent authenticated mutation.
 The outage proof restarts the gateway while committing through the application
 service. It verifies lost transport and reconciliation. It does not claim a hosted
 provider upgrade/restart test; self-host bootstrap recreates provider auth state.
+
+CI pulls the official Docker Hub provider releases. Local runs may reuse the
+CLI's cached ECR images at the identical pinned versions; ECR's shared anonymous
+download quota is unsuitable as the default for hosted CI. HTTP security checks
+include open-handle detection to inspect application teardown directly.

@@ -12,6 +12,21 @@ fixture_network="$fixture_id-network"
 fixture_database="$fixture_id-db"
 fixture_realtime="$fixture_id-realtime"
 fixture_gateway="$fixture_id-gateway"
+
+# The CLI's ECR mirror has a shared anonymous download quota on hosted runners.
+# Prefer the official Docker Hub release; reuse an identical-version cached CLI
+# image locally without downloading another copy of the large database image.
+cached_provider_image() {
+  if docker image inspect "$1" >/dev/null 2>&1; then
+    printf '%s\n' "$1"
+  elif docker image inspect "$2" >/dev/null 2>&1; then
+    printf '%s\n' "$2"
+  else
+    printf '%s\n' "$1"
+  fi
+}
+postgres_image="$(cached_provider_image supabase/postgres:17.6.1.165 public.ecr.aws/supabase/postgres:17.6.1.165)"
+realtime_image="$(cached_provider_image supabase/realtime:v2.129.3 public.ecr.aws/supabase/realtime:v2.129.3)"
 cleanup() {
   fixture_exit=$?
   if [ "$fixture_exit" -ne 0 ]; then
@@ -32,7 +47,7 @@ docker run -d --name "$fixture_database" --label "$fixture_label" \
   --network "$fixture_network" --network-alias db -p 127.0.0.1:15449:5432 \
   -e POSTGRES_PASSWORD=events-test-only -e POSTGRES_DB=postgres \
   -e JWT_SECRET=pathway-events-local-jwt-secret-at-least-32-characters \
-  public.ecr.aws/supabase/postgres:17.6.1.165 \
+  "$postgres_image" \
   -c listen_addresses='*' -c wal_level=logical -c max_replication_slots=10 -c max_wal_senders=10 >/dev/null
 for attempt in $(seq 1 60); do
   if docker exec "$fixture_database" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then break; fi
@@ -55,7 +70,7 @@ docker run -d --name "$fixture_realtime" --label "$fixture_label" \
   -e SECRET_KEY_BASE=pathway-events-local-secret-key-base-000000000000000000000000000000 \
   -e 'ERL_AFLAGS=+S 2:2 -proto_dist inet_tcp' -e DNS_NODES= -e RLIMIT_NOFILE=10000 \
   -e APP_NAME=realtime -e SEED_SELF_HOST=true -e RUN_JANITOR=true \
-  -e DISABLE_HEALTHCHECK_LOGGING=true public.ecr.aws/supabase/realtime:v2.129.3 >/dev/null
+  -e DISABLE_HEALTHCHECK_LOGGING=true "$realtime_image" >/dev/null
 for attempt in $(seq 1 90); do
   if [ "$(docker exec "$fixture_database" psql -U supabase_admin -d pathway_realtime_notifications_test -Atc "SELECT to_regclass('realtime.messages') IS NOT NULL" 2>/dev/null)" = t ]; then break; fi
   sleep 1
@@ -97,4 +112,4 @@ E2E_USE_GLOBAL_SETUP=false E2E_ALLOW_RESET=false \
   TEST_DATABASE_URL="$REALTIME_PROVIDER_DATABASE_URL?schema=app" \
   E2E_DATABASE_URL="$REALTIME_PROVIDER_DATABASE_URL?schema=app" \
   TEST_AUTH_TOKEN_SECRET=isolated-realtime-provider-http-only \
-  pnpm --filter @pathway/api run test:integration --runTestsByPath src/messaging/tests/family-messaging-security.e2e.spec.ts
+  pnpm --filter @pathway/api run test:integration --detectOpenHandles --runTestsByPath src/messaging/tests/family-messaging-security.e2e.spec.ts
