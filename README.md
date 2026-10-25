@@ -271,6 +271,10 @@ To run the Nest API over HTTPS on `https://api.localhost:3001` without browser c
    API_HOST=api.localhost
    ```
 4. Start the API; browse at `https://api.localhost:3001`.
+5. So the Next.js server can call the dev API over HTTPS (for example `redeemDownloadToken` in `apps/web`), have Node trust the mkcert root CA before starting the web app:
+   ```
+   export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+   ```
 
 ## Docker Setup
 

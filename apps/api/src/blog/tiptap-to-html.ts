@@ -11,6 +11,16 @@ type TipTapNode = {
   marks?: Array<{ type: string; attrs?: Record<string, unknown> }>;
 };
 
+/** Allow relative URLs and http(s)/mailto/tel only; anything else (javascript:, data:, ...) becomes "#". */
+export function safeHref(href: string): string {
+  // Browsers ignore control chars and spaces inside a scheme ("java\tscript:"), so strip them to check.
+  const compact = [...href].filter((c) => c.charCodeAt(0) > 32).join("");
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(compact)?.[1]?.toLowerCase();
+  return scheme && !["http", "https", "mailto", "tel"].includes(scheme)
+    ? "#"
+    : href;
+}
+
 function escapeHtml(text: string): string {
   const map: Record<string, string> = {
     "&": "&amp;",
@@ -39,7 +49,7 @@ function renderMarks(text: string, marks?: TipTapNode["marks"]): string {
           m.attrs?.target === "_blank"
             ? ' target="_blank" rel="noopener noreferrer"'
             : "";
-        out = `<a href="${escapeHtml(href)}"${target}>${out}</a>`;
+        out = `<a href="${escapeHtml(safeHref(href))}"${target}>${out}</a>`;
         break;
       }
       case "code":

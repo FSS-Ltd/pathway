@@ -17,6 +17,9 @@ on:
           - admin
           - api
 
+permissions:
+  contents: read
+
 concurrency:
   group: vercel-production-${{ github.ref_name }}
   cancel-in-progress: false

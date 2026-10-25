@@ -8,6 +8,10 @@ const __dirname = path.dirname(__filename);
 const nextConfig = {
   reactStrictMode: true,
 
+  // ponytail: images.unoptimized closes the Next 14 image-optimizer RCE path (GHSA-2464-fhr4-w9xw,
+  // GHSA-2xp9-vwfh-vxw4) until the Next 15 upgrade lands. Remove it in that PR.
+  images: { unoptimized: true },
+
   // Docker/self-host builds opt in to standalone; Vercel should use its native output.
   output: process.env.NEXT_STANDALONE === "true" ? "standalone" : undefined,
 

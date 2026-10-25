@@ -819,3 +819,30 @@ describe("TIER_HIERARCHY (Phase 0 PR 0.2)", () => {
     expect(TIER_HIERARCHY.starter).toBeLessThan(TIER_HIERARCHY.growth);
   });
 });
+
+describe("BuyNowService.generateSlug", () => {
+  // generateSlug is private and dependency-free, so skip the constructor.
+  const generateSlug = (name: string): string =>
+    (
+      Object.create(BuyNowService.prototype) as unknown as {
+        generateSlug(n: string): string;
+      }
+    ).generateSlug(name);
+
+  it("builds a url-safe slug with a hex suffix", () => {
+    expect(generateSlug("St. Mary's  School!!")).toMatch(
+      /^st-mary-s-school-[0-9a-f]{6}$/,
+    );
+  });
+
+  it("returns quickly for hostile, very long names and stays within 50+7 chars", () => {
+    const start = Date.now();
+    const slug = generateSlug(`${"-".repeat(200_000)}x${"!".repeat(200_000)}`);
+    expect(Date.now() - start).toBeLessThan(100);
+    expect(slug.length).toBeLessThanOrEqual(57);
+  });
+
+  it("gives different suffixes for the same name", () => {
+    expect(generateSlug("Same Org")).not.toBe(generateSlug("Same Org"));
+  });
+});

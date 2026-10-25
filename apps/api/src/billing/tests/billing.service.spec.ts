@@ -21,7 +21,7 @@ describe("BillingService", () => {
     expect(result.provider).toBe("stripe");
     expect(result.planCode).toBe("starter");
     expect(result.mode).toBe("subscription");
-    expect(result.sessionId).toMatch(/^sess_/);
+    expect(result.sessionId).toMatch(/^sess_[0-9a-f]{16}$/);
     expect(result.checkoutUrl).toContain("https://example.com/success");
   });
 

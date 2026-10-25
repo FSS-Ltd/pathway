@@ -15,6 +15,9 @@ const cspReportOnly = [
 
 const nextConfig = {
   reactStrictMode: true,
+  // ponytail: images.unoptimized closes the Next 14 image-optimizer RCE path (GHSA-2464-fhr4-w9xw,
+  // GHSA-2xp9-vwfh-vxw4) until the Next 15 upgrade lands. Remove it in that PR.
+  images: { unoptimized: true },
   output: process.env.NEXT_STANDALONE === "true" ? "standalone" : undefined,
   eslint: {
     ignoreDuringBuilds: true,

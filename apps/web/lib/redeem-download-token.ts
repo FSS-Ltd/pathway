@@ -12,11 +12,6 @@ const apiBaseUrl =
     ? `https://localhost:${process.env.API_PORT ?? "3003"}`
     : process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003");
 
-const insecureAgent =
-  process.env.NODE_ENV !== "production"
-    ? new https.Agent({ rejectUnauthorized: false })
-    : undefined;
-
 export async function redeemDownloadToken(token: string): Promise<{
   ok: boolean;
   status: number;
@@ -38,7 +33,6 @@ export async function redeemDownloadToken(token: string): Promise<{
           "Content-Type": "application/json",
           "Content-Length": Buffer.byteLength(body),
         },
-        ...(isHttps && insecureAgent ? { agent: insecureAgent } : {}),
       },
       (response) => {
         const chunks: Buffer[] = [];
