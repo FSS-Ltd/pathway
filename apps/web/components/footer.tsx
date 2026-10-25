@@ -128,7 +128,7 @@ export default function Footer() {
         <div className="mt-8 border-t border-border-subtle pt-8 text-center text-sm text-text-muted">
           <p>
             &copy; {new Date().getFullYear()} Nexsteps. All rights reserved.{" "}
-            <span className="text-text-muted/70">v{APP_VERSION}</span>
+            <span className="text-text-muted/[0.85]">v{APP_VERSION}</span>
           </p>
         </div>
       </div>

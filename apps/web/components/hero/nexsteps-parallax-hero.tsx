@@ -26,6 +26,7 @@ const VIDEO_SOURCES = {
   },
 };
 const POSTER = "/hero/nexsteps-hero-poster.webp";
+const POSTER_PORTRAIT = "/hero/nexsteps-hero-poster-portrait.webp";
 
 // Portion of scroll progress that scrubs the video; the rest holds the final
 // calm frame while the logo/tagline take over.
@@ -285,6 +286,14 @@ export default function NexStepsParallaxHero() {
 
   return (
     <div ref={outerRef} className="relative -mt-20 h-[550vh] bg-slate-950">
+      {/* Hoisted to <head>: starts the phone poster with the HTML, not after the CSS. */}
+      <link
+        rel="preload"
+        as="image"
+        href={POSTER_PORTRAIT}
+        media="(max-width: 767px) and (max-aspect-ratio: 3/4)"
+        fetchPriority="high"
+      />
       <div className="sticky top-0 h-[100svh] overflow-hidden">
         {/* Base gradient so the scene reads correctly before video frames arrive */}
         <div
@@ -293,8 +302,7 @@ export default function NexStepsParallaxHero() {
         />
         <div
           aria-hidden
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${POSTER})` }}
+          className="hero-poster absolute inset-0 bg-cover bg-center"
         />
         {!videoFailed && sources ? (
           <video
@@ -303,7 +311,6 @@ export default function NexStepsParallaxHero() {
             muted
             playsInline
             preload="auto"
-            poster={POSTER}
             aria-hidden
             onLoadedMetadata={(e) => {
               // iOS refuses to buffer video until playback starts, leaving

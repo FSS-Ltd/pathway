@@ -11,7 +11,6 @@ const cspReportOnly = [
   "font-src 'self' data:",
   `connect-src 'self' ${apiOrigin} https://www.google-analytics.com https://*.google-analytics.com https://www.googletagmanager.com`,
   "form-action 'self'",
-  "upgrade-insecure-requests",
 ].join("; ");
 
 const nextConfig = {
