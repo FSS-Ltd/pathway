@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import {
   Inject,
   Injectable,
@@ -361,13 +362,14 @@ export class BuyNowService {
    */
   private generateSlug(name: string): string {
     const base = name
+      .slice(0, 200) // bound regex input; the slug is capped at 50 chars anyway
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .substring(0, 50);
 
     // Add random suffix to avoid collisions
-    const suffix = Math.random().toString(36).substring(2, 8);
+    const suffix = randomBytes(3).toString("hex");
     return `${base}-${suffix}`;
   }
 

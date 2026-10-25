@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import type { CheckoutDto } from "./dto/checkout.dto";
 
@@ -30,7 +31,7 @@ interface BillingProvider {
  */
 class StripeStubAdapter implements BillingProvider {
   async checkout(input: CheckoutDto): Promise<CheckoutResult> {
-    const fakeId = `sess_${Math.random().toString(36).slice(2, 10)}`;
+    const fakeId = `sess_${randomBytes(8).toString("hex")}`;
 
     // Build a safe redirect URL derived from successUrl
     const url = new URL(input.successUrl);

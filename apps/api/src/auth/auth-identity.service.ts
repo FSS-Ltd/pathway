@@ -18,8 +18,9 @@ type UpsertResult = {
 /**
  * Check if a string looks like an email address.
  */
-function isEmail(value: string | null | undefined): boolean {
-  if (!value || typeof value !== "string") return false;
+export function isEmail(value: string | null | undefined): boolean {
+  // 254 is the SMTP path limit; bounding length keeps the regex linear-time in practice.
+  if (!value || typeof value !== "string" || value.length > 254) return false;
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(value.trim());
 }

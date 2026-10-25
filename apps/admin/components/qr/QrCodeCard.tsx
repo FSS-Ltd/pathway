@@ -13,6 +13,13 @@ export interface QrCodeCardProps {
   embedded?: boolean;
 }
 
+export function escapeHtml(text: string): string {
+  return text.replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c,
+  );
+}
+
 function truncateUrl(url: string, maxLen = 48): string {
   if (url.length <= maxLen) return url;
   return url.slice(0, maxLen - 3) + "...";
@@ -74,11 +81,11 @@ export function QrCodeCard({
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
-        <head><title>${title}</title></head>
+        <head><title>${escapeHtml(title)}</title></head>
         <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;font-family:system-ui,sans-serif;">
-          <h1 style="margin-bottom:1rem;font-size:1.25rem;">${title}</h1>
+          <h1 style="margin-bottom:1rem;font-size:1.25rem;">${escapeHtml(title)}</h1>
           <div>${svgString}</div>
-          <p style="margin-top:1rem;font-size:0.75rem;color:#666;word-break:break-all;max-width:20rem;text-align:center;">${value}</p>
+          <p style="margin-top:1rem;font-size:0.75rem;color:#666;word-break:break-all;max-width:20rem;text-align:center;">${escapeHtml(value)}</p>
         </body>
       </html>
     `);
