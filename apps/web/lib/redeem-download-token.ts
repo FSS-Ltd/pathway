@@ -12,17 +12,6 @@ const apiBaseUrl =
     ? `https://localhost:${process.env.API_PORT ?? "3003"}`
     : process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003");
 
-const insecureAgent = new https.Agent({ rejectUnauthorized: false });
-
-/** Self-signed certs are only tolerated for a local dev API, never for a remote host or in production. */
-export function allowsSelfSignedCert(url: URL, nodeEnv: string | undefined): boolean {
-  return (
-    nodeEnv !== "production" &&
-    url.protocol === "https:" &&
-    ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
-  );
-}
-
 export async function redeemDownloadToken(token: string): Promise<{
   ok: boolean;
   status: number;
@@ -44,9 +33,6 @@ export async function redeemDownloadToken(token: string): Promise<{
           "Content-Type": "application/json",
           "Content-Length": Buffer.byteLength(body),
         },
-        ...(allowsSelfSignedCert(url, process.env.NODE_ENV)
-          ? { agent: insecureAgent }
-          : {}),
       },
       (response) => {
         const chunks: Buffer[] = [];
