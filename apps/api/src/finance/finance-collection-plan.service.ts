@@ -42,15 +42,20 @@ export class FinanceCollectionPlanService {
     private readonly stripeConfig: FinanceStripeCheckoutConfig,
   ) {}
 
+  /** Stored mandate, customer and account records must match the configured Stripe mode. */
+  private get isLive(): boolean {
+    return this.stripeConfig.mode === "live";
+  }
+
   async create(
     actor: FinanceCollectionPlanActor,
     invoiceId: string,
     draft: FinanceCollectionPlanDraft,
   ): Promise<{ planId: string; status: "PENDING_REVIEW" }> {
     await this.financeAccess.assertStaffAction(actor, "SCHEDULE_DEBIT");
-    if (this.stripeConfig.mode !== "test") {
+    if (this.stripeConfig.mode === "disabled") {
       throw new ServiceUnavailableException(
-        "Finance Bacs collection is available only in the test environment",
+        "Finance Bacs collection is not configured",
       );
     }
     validatePlanDraft(draft);
@@ -484,9 +489,9 @@ export class FinanceCollectionPlanService {
       actor,
       "APPROVE_AUTOMATED_DEBIT",
     );
-    if (this.stripeConfig.mode !== "test") {
+    if (this.stripeConfig.mode === "disabled") {
       throw new ServiceUnavailableException(
-        "Finance Bacs collection is available only in the test environment",
+        "Finance Bacs collection is not configured",
       );
     }
     const initial = await withTenantRlsContext(
@@ -592,20 +597,20 @@ export class FinanceCollectionPlanService {
         );
       }
       if (
-        this.stripeConfig.mode !== "test" ||
+        this.stripeConfig.mode === "disabled" ||
         plan.currency !== "GBP" ||
         plan.consentVersion !== FINANCE_BACS_COLLECTION_TERMS_VERSION ||
         plan.mandate.status !== "ACTIVE" ||
         plan.mandate.consentVersion !== FINANCE_BACS_MANDATE_CONSENT_VERSION ||
-        plan.mandate.livemode ||
+        plan.mandate.livemode !== this.isLive ||
         plan.mandate.stripeCustomer.stripeAccountId !==
           plan.stripeConnection.stripeAccountId ||
         plan.mandate.stripeCustomer.stripeConnectionId !==
           plan.stripeConnection.id ||
         plan.mandate.stripeCustomer.payerAccountId !== plan.payerAccountId ||
-        plan.mandate.stripeCustomer.livemode ||
+        plan.mandate.stripeCustomer.livemode !== this.isLive ||
         plan.stripeConnection.status !== "READY" ||
-        plan.stripeConnection.livemode ||
+        plan.stripeConnection.livemode !== this.isLive ||
         plan.mandate.stripeConnectionId !== plan.stripeConnection.id ||
         plan.mandate.stripeAccountId !== plan.stripeConnection.stripeAccountId
       ) {

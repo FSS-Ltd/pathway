@@ -1,4 +1,7 @@
-import { FINANCE_BACS_COLLECTION_TERMS_VERSION } from "../domain/finance-collection-terms";
+import {
+  FINANCE_BACS_COLLECTION_TERMS_VERSION,
+  FINANCE_BACS_MANDATE_CONSENT_VERSION,
+} from "../domain/finance-collection-terms";
 import { withTenantRlsContext } from "@pathway/db";
 import type { Prisma } from "@pathway/db";
 import type { FinanceAccessService } from "../access/finance-access.service";
@@ -91,20 +94,27 @@ describe("FinanceCollectionPlanService", () => {
       .mockResolvedValue(
         new Map([[invoice.id, { outstandingMinor: "12000" }]]),
       );
-    service = new FinanceCollectionPlanService(
+    service = serviceFor("test");
+  });
+
+  function serviceFor(mode: "test" | "live" | "disabled") {
+    return new FinanceCollectionPlanService(
       {
         assertStaffAction: jest.fn().mockResolvedValue(undefined),
         assertPayerAction: jest.fn().mockResolvedValue(undefined),
+        authorizeAutomatedDebitApproval: jest.fn().mockResolvedValue(undefined),
       } as unknown as FinanceAccessService,
       {
         forInvoices: balanceForInvoices,
       } as unknown as FinanceBalanceService,
-      {
-        mode: "test",
-        webAppUrl: "https://family.example.test",
-      } as FinanceStripeCheckoutConfig,
+      (mode === "disabled"
+        ? { mode }
+        : {
+            mode,
+            webAppUrl: "https://family.example.test",
+          }) as FinanceStripeCheckoutConfig,
     );
-  });
+  }
 
   it.each([
     [1_000_001n, 1],
@@ -178,5 +188,143 @@ describe("FinanceCollectionPlanService", () => {
       }),
     );
     expect(tx.financeCollectionPlan.create).not.toHaveBeenCalled();
+  });
+
+  describe("collection mode", () => {
+    const draft = {
+      payerAccountId,
+      mandateId,
+      instalmentCount: 3,
+      firstDueDate: "2027-01-05",
+    };
+
+    it("does not accept new collection plans when Finance collection is disabled", async () => {
+      await expect(
+        serviceFor("disabled").create(actor, invoice.id, draft),
+      ).rejects.toMatchObject({ status: 503 });
+      expect(tx.financeCollectionPlan.create).not.toHaveBeenCalled();
+    });
+
+    it("creates a live plan against a live school account and mandate", async () => {
+      tx.financeCollectionPlan.findFirst.mockResolvedValue(null);
+      tx.financeMandate.findFirst.mockResolvedValue({
+        id: mandateId,
+        stripeConnectionId: "connection-a",
+        stripeAccountId: "acct_school_live",
+        livemode: true,
+      });
+      tx.financeStripeConnection.findFirst.mockResolvedValue({
+        id: "connection-a",
+        stripeAccountId: "acct_school_live",
+        livemode: true,
+      });
+      await expect(
+        serviceFor("live").create(actor, invoice.id, draft),
+      ).resolves.toEqual({ planId: "plan-new", status: "PENDING_REVIEW" });
+      expect(tx.financeStripeConnection.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ livemode: true }),
+        }),
+      );
+    });
+
+    it("refuses a live plan when the stored mandate is a test-mode record", async () => {
+      tx.financeCollectionPlan.findFirst.mockResolvedValue(null);
+      tx.financeStripeConnection.findFirst.mockResolvedValue({
+        id: "connection-a",
+        stripeAccountId: "acct_school_test",
+        livemode: true,
+      });
+      await expect(
+        serviceFor("live").create(actor, invoice.id, draft),
+      ).rejects.toThrow("does not match the school account");
+      expect(tx.financeCollectionPlan.create).not.toHaveBeenCalled();
+    });
+
+    describe("resumeByStaff", () => {
+      const resumeBase = {
+        id: "plan-a",
+        status: "PAUSED",
+        invoiceId: invoice.id,
+        payerAccountId,
+        acceptedByUserId: "payer-user",
+        createdByUserId: "creator",
+        approvedByUserId: "someone-else",
+        amountMinor: 12_000n,
+        currency: "GBP",
+        consentVersion: FINANCE_BACS_COLLECTION_TERMS_VERSION,
+      };
+      const resumable = (live: boolean) => ({
+        ...resumeBase,
+        mandate: {
+          status: "ACTIVE",
+          consentVersion: FINANCE_BACS_MANDATE_CONSENT_VERSION,
+          stripeConnectionId: "connection-a",
+          stripeAccountId: "acct_school",
+          livemode: live,
+          stripeCustomer: {
+            stripeAccountId: "acct_school",
+            stripeConnectionId: "connection-a",
+            payerAccountId,
+            livemode: live,
+          },
+        },
+        stripeConnection: {
+          id: "connection-a",
+          status: "READY",
+          stripeAccountId: "acct_school",
+          livemode: live,
+        },
+      });
+      function prepareResume(live: boolean) {
+        Object.assign(tx, {
+          financeDebitAttempt: { findFirst: jest.fn().mockResolvedValue(null) },
+        });
+        (tx.financeCollectionInstalment as Record<string, jest.Mock>) = {
+          ...tx.financeCollectionInstalment,
+          findMany: jest.fn().mockResolvedValue([{ amountMinor: 12_000n }]),
+          updateMany: jest.fn().mockResolvedValue({}),
+        };
+        tx.financeInvoice.findFirst.mockResolvedValue({
+          id: invoice.id,
+          status: "ISSUED",
+          totalMinor: 12_000n,
+          issuedAt: invoice.issuedAt,
+        });
+        tx.financeCollectionPlan.findFirst
+          .mockReset()
+          .mockResolvedValueOnce(resumeBase)
+          .mockResolvedValueOnce(resumable(live));
+        tx.$queryRaw.mockResolvedValue([{ id: "locked" }]);
+      }
+
+      it("is unavailable when Finance collection is disabled", async () => {
+        prepareResume(false);
+        await expect(
+          serviceFor("disabled").resumeByStaff(actor, "plan-a"),
+        ).rejects.toMatchObject({ status: 503 });
+      });
+
+      it("resumes a live plan whose mandate, customer and account are live", async () => {
+        prepareResume(true);
+        await expect(
+          serviceFor("live").resumeByStaff(actor, "plan-a"),
+        ).resolves.toEqual({ planId: "plan-a", status: "ACTIVE" });
+      });
+
+      it("refuses to resume a live plan that holds test-mode records", async () => {
+        prepareResume(false);
+        await expect(
+          serviceFor("live").resumeByStaff(actor, "plan-a"),
+        ).rejects.toThrow("The mandate or collection account is not eligible");
+      });
+
+      it("refuses to resume a test plan that holds live records", async () => {
+        prepareResume(true);
+        await expect(
+          serviceFor("test").resumeByStaff(actor, "plan-a"),
+        ).rejects.toThrow("The mandate or collection account is not eligible");
+      });
+    });
   });
 });

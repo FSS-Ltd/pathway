@@ -234,3 +234,107 @@ describe("StripeFinanceBacsProvider", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 });
+
+describe("StripeFinanceBacsProvider live and test mode", () => {
+  const liveConfig = {
+    mode: "live",
+    secretKey: "sk_live_finance_fixture",
+    webAppUrl: "https://family.example.test",
+  } satisfies Extract<FinanceStripeCheckoutConfig, { mode: "live" }>;
+  const customerInput = {
+    stripeAccountId: "acct_school",
+    payerAccountId: "payer-1",
+    displayName: "Alex Example",
+    idempotencyKey: "finance-customer-1",
+  };
+  const setupInput = {
+    stripeAccountId: "acct_school",
+    stripeCustomerId: "cus_school_payer",
+    mandateId: "mandate-1",
+    payerAccountId: "payer-1",
+    consentVersion: "bacs-2026-01",
+    idempotencyKey: "finance-mandate-setup-1",
+  };
+  const debitInput = {
+    stripeAccountId: "acct_school",
+    customerId: "cus_school_payer",
+    paymentMethodId: "pm_school_bacs",
+    debitAttemptId: "debit-1",
+    instalmentId: "instalment-1",
+    amountMinor: 5_000n,
+    idempotencyKey: "finance-debit-attempt-1",
+  };
+  const responses = (livemode: boolean) => ({
+    customer: { id: "cus_school_payer", livemode },
+    session: {
+      id: "cs_mandate",
+      livemode,
+      url: "https://checkout.stripe.com/c/pay/cs_mandate",
+      expires_at: 1_800_000_000,
+    },
+    intent: {
+      id: "pi_debit",
+      livemode,
+      amount: 5_000,
+      currency: "gbp",
+      customer: "cus_school_payer",
+      payment_method: "pm_school_bacs",
+      status: "processing",
+    },
+  });
+  const calls = [
+    [
+      "customer",
+      (p: StripeFinanceBacsProvider) => p.createCustomer(customerInput),
+    ],
+    [
+      "setup session",
+      (p: StripeFinanceBacsProvider) => p.createMandateSetupSession(setupInput),
+    ],
+    ["debit", (p: StripeFinanceBacsProvider) => p.createDebit(debitInput)],
+  ] as const;
+  const key = {
+    customer: "customer",
+    "setup session": "session",
+    debit: "intent",
+  } as const;
+
+  it.each(calls)(
+    "accepts a live %s response in live mode",
+    async (name, call) => {
+      const fetcher = jest
+        .fn()
+        .mockResolvedValue(stripeResponse(responses(true)[key[name]]));
+      await expect(
+        call(new StripeFinanceBacsProvider(liveConfig, fetcher)),
+      ).resolves.toBeDefined();
+      expect(fetcher.mock.calls[0]?.[1]?.headers).toMatchObject({
+        Authorization: "Bearer sk_live_finance_fixture",
+      });
+    },
+  );
+
+  it.each(calls)(
+    "rejects a test-mode %s response in live mode",
+    async (name, call) => {
+      const fetcher = jest
+        .fn()
+        .mockResolvedValue(stripeResponse(responses(false)[key[name]]));
+      await expect(
+        call(new StripeFinanceBacsProvider(liveConfig, fetcher)),
+      ).rejects.toMatchObject({ retryable: true });
+    },
+  );
+
+  it.each(calls)(
+    "rejects a live %s response in test mode",
+    async (name, call) => {
+      const fetcher = jest
+        .fn()
+        .mockResolvedValue(stripeResponse(responses(true)[key[name]]));
+      await expect(
+        call(new StripeFinanceBacsProvider(testConfig, fetcher)),
+      ).rejects.toMatchObject({ retryable: true });
+    },
+  );
+});

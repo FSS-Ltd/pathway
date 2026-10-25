@@ -91,6 +91,9 @@ describe("FinanceBacsCollectionService", () => {
     financeCollectionPlanEvent: { create: jest.Mock };
   };
   let service: FinanceBacsCollectionService;
+  let makeService: (
+    mode: "test" | "live" | "disabled",
+  ) => FinanceBacsCollectionService;
   let provider: { createDebit: jest.Mock };
   let debitAttempt: {
     id: string;
@@ -193,13 +196,15 @@ describe("FinanceBacsCollectionService", () => {
         .mockRejectedValueOnce(new FinanceStripeBacsProviderError(true))
         .mockResolvedValue({ id: "pi_school_bacs", status: "processing" }),
     };
-    service = new FinanceBacsCollectionService(
-      financeAccess as unknown as FinanceAccessService,
-      balances as unknown as FinanceBalanceService,
-      recurringInvoices as unknown as FinanceRecurringInvoiceService,
-      { mode: "test" } as unknown as FinanceStripeCheckoutConfig,
-      provider as unknown as FinanceStripeBacsProvider,
-    );
+    makeService = (mode: "test" | "live" | "disabled") =>
+      new FinanceBacsCollectionService(
+        financeAccess as unknown as FinanceAccessService,
+        balances as unknown as FinanceBalanceService,
+        recurringInvoices as unknown as FinanceRecurringInvoiceService,
+        { mode } as unknown as FinanceStripeCheckoutConfig,
+        provider as unknown as FinanceStripeBacsProvider,
+      );
+    service = makeService("test");
   });
 
   afterEach(() => jest.useRealTimers());
@@ -291,5 +296,69 @@ describe("FinanceBacsCollectionService", () => {
     );
     expect(tx.financeDebitAttempt.create).not.toHaveBeenCalled();
     expect(lockInvoice).toHaveBeenCalled();
+  });
+
+  describe("collection mode", () => {
+    const withMode = (live: boolean) => ({
+      ...installment,
+      plan: {
+        ...installment.plan,
+        stripeConnection: {
+          ...installment.plan.stripeConnection,
+          livemode: live,
+        },
+        mandate: {
+          ...installment.plan.mandate,
+          livemode: live,
+          stripeCustomer: {
+            ...installment.plan.mandate.stripeCustomer,
+            livemode: live,
+          },
+        },
+      },
+    });
+    function useRecords(live: boolean) {
+      provider.createDebit
+        .mockReset()
+        .mockResolvedValue({ id: "pi_school_bacs", status: "processing" });
+      tx.financeCollectionInstalment.findFirst
+        .mockReset()
+        .mockResolvedValueOnce({
+          plan: {
+            id: "plan-1",
+            invoiceId: "invoice-1",
+            payerAccountId: "payer-1",
+            acceptedByUserId: "payer-user-1",
+          },
+        })
+        .mockResolvedValue(withMode(live));
+    }
+
+    it("does not run when Finance collection is disabled", async () => {
+      await expect(
+        makeService("disabled").runDue(new Date("2026-10-21T12:00:00Z")),
+      ).rejects.toMatchObject({ status: 503 });
+      expect(provider.createDebit).not.toHaveBeenCalled();
+    });
+
+    it("submits a debit for a live mandate, customer and account in live mode", async () => {
+      useRecords(true);
+      await expect(
+        makeService("live").runDue(new Date("2026-10-21T12:00:00Z")),
+      ).resolves.toMatchObject({ debitsSubmitted: 1 });
+      expect(provider.createDebit).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not debit test-mode records in live mode", async () => {
+      useRecords(false);
+      await makeService("live").runDue(new Date("2026-10-21T12:00:00Z"));
+      expect(provider.createDebit).not.toHaveBeenCalled();
+    });
+
+    it("does not debit live records in test mode", async () => {
+      useRecords(true);
+      await makeService("test").runDue(new Date("2026-10-21T12:00:00Z"));
+      expect(provider.createDebit).not.toHaveBeenCalled();
+    });
   });
 });

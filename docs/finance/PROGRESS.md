@@ -723,3 +723,17 @@ No live setting was changed and no real payment was taken.
 - Pause is `FINANCE_STRIPE_LIVE_ENABLED=false` plus a redeploy; servicing stays on.
 
 Switching live collection on is the owner's decision.
+
+## Live Bacs enabled in code (not switched on)
+
+Branch `feature/finance-live-bacs`. Bacs now follows the configured Stripe mode instead of being
+pinned to test. Changed: the Bacs provider (accepts live responses in live mode, rejects the
+other mode both ways), module wiring, mandate setup, plan creation and resume, the due-collection
+job, and mandate activation from a live setup event (a live setup used to be cancelled instead of
+activated). Stored mandates, customers and school accounts must match the configured mode.
+
+Tests added first and seen failing: provider (mode matrix), plan service (create and resume),
+collection service (disabled, live, mixed records), mandate setup guard and live activation.
+Finance unit suites: 92 suites, 594 tests pass; API typecheck and lint pass. The database-backed
+Finance suites run in CI. No live setting changed and nothing was debited. Switching live collection
+on, and scheduling the Bacs job, remain the owner's decisions.

@@ -190,7 +190,6 @@ export class FinanceStripeBacsWebhookService {
         }
         const canActivate =
           financeMode === "ACTIVE" &&
-          !event.livemode &&
           mandate.consentVersion === FINANCE_BACS_MANDATE_CONSENT_VERSION &&
           event.consentVersion === FINANCE_BACS_MANDATE_CONSENT_VERSION &&
           payerGrants.length === 1 &&
