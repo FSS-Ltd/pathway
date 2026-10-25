@@ -720,7 +720,7 @@ No live setting was changed and no real payment was taken.
 - Card: live collection is configuration only, after seven platform gates (P1 to P7).
 - Bacs: the provider is bound to test mode and rejects live responses, and the collection job
   refuses to run outside test mode. Live Bacs needs its own reviewed code change.
-- Pause is `FINANCE_STRIPE_LIVE_ENABLED=false` plus a redeploy; servicing stays on.
+- Pause is `FINANCE_STRIPE_CONNECT_MODE=disabled` plus `FINANCE_STRIPE_LIVE_ENABLED=false` together, then a redeploy; servicing stays on when its own live mode and key are set explicitly.
 
 Switching live collection on is the owner's decision.
 

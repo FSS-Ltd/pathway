@@ -30,7 +30,8 @@ Use after the owner has switched live collection on and the platform gates in
 ## Stop and pause
 
 Any unexplained difference, duplicate receipt, wrong amount or access error: stop, set
-`FINANCE_STRIPE_LIVE_ENABLED=false`, redeploy, and open the matching runbook. Do not edit the
+`FINANCE_STRIPE_CONNECT_MODE=disabled` and `FINANCE_STRIPE_LIVE_ENABLED=false` together,
+redeploy, and open the matching runbook (see the pause section of the go-live design). Do not edit the
 ledger by hand or mark anything paid manually to make a figure agree.
 
 ## Refunds

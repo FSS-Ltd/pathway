@@ -46,12 +46,26 @@ own retention, tax and parent-notification decisions. NexSteps does not invent a
 
 Production only. Never copy test values or a local `.env`.
 
-1. Set `FINANCE_STRIPE_SERVICING_MODE=live` with the matching restricted key, so existing records
-   can always be serviced and refunded even if collection is stopped.
-2. Register `FINANCE_STRIPE_WEBHOOK_SECRET_LIVE` and confirm signed delivery with a Stripe test event.
-3. Set `FINANCE_STRIPE_CONNECT_MODE=live` and HTTPS return and refresh URLs, then
-   `FINANCE_STRIPE_LIVE_ENABLED=true` last. The application refuses this unless `NODE_ENV` and
-   `VERCEL_ENV` are both production.
+1. Set `FINANCE_STRIPE_SERVICING_MODE=live` and `FINANCE_STRIPE_SERVICING_SECRET_KEY_LIVE` (a live
+   `sk_live_` or restricted `rk_live_` key) explicitly, so existing records can always be serviced
+   and refunded even if collection is paused.
+2. In Stripe (live mode) add a webhook endpoint that listens to events **on connected accounts**,
+   pointing at `https://<api host>/finance/stripe/webhook` (the API has no path prefix). Select
+   these events: `account.updated`, `checkout.session.completed`, `checkout.session.expired`,
+   `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`,
+   `payment_intent.processing`, `payment_intent.succeeded`, `payment_intent.payment_failed`,
+   `payment_intent.canceled`, `setup_intent.succeeded`, `setup_intent.setup_failed`,
+   `mandate.updated`, `payment_method.detached`, `refund.created`, `refund.updated`,
+   `refund.failed`, `charge.refund.updated`, `charge.dispute.funds_withdrawn`,
+   `charge.dispute.funds_reinstated`. Put its signing secret in
+   `FINANCE_STRIPE_WEBHOOK_SECRET_LIVE`. Without that secret the Finance webhook is off: payments
+   would be taken but not recorded until recovery reads them from Stripe.
+3. Set all of these together, Production only, and `FINANCE_STRIPE_LIVE_ENABLED=true` last:
+   `FINANCE_STRIPE_CONNECT_MODE=live`, `FINANCE_STRIPE_CONNECT_RETURN_URL` and
+   `FINANCE_STRIPE_CONNECT_REFRESH_URL` (absolute HTTPS URLs), and a valid `WEB_APP_URL` (HTTPS,
+   origin only). Live billing credentials must already be configured. If any of these is missing or
+   inconsistent the API refuses to start, so redeploy once with the full set. The application also
+   refuses live mode unless `NODE_ENV` and `VERCEL_ENV` are both production.
 4. Redeploy. Confirm a school with Finance sees the live connection step and a school without it
    is still refused.
 5. Reconcile the first real payment from whichever customer pays first, using the
@@ -78,9 +92,13 @@ opens a recovery case; never adjust the ledger by hand.
 | Wrong amount, duplicate or dispute | Receipt needs reversing        | [Refunds and returns](runbooks/refunds-and-returns.md)                      |
 | Anything unexplained               | Possible money or access fault | **Pause**, then investigate                                                 |
 
-**Pause:** set `FINANCE_STRIPE_LIVE_ENABLED=false` and redeploy. New collection stops for every
-school. Servicing stays on, so in-flight payments, refunds and statements keep working. Resume
-after the cause is recorded. Servicing mode `disabled` also stops provider reads, for incidents only.
+**Pause:** set `FINANCE_STRIPE_CONNECT_MODE=disabled` and `FINANCE_STRIPE_LIVE_ENABLED=false`
+**together** and redeploy. Setting only one of them stops the API from starting: live mode needs the
+live switch, and the live switch needs live mode. New collection stops for every school, card and
+Bacs. Servicing stays on only if `FINANCE_STRIPE_SERVICING_MODE=live` and
+`FINANCE_STRIPE_SERVICING_SECRET_KEY_LIVE` were set explicitly beforehand (see enablement step 1);
+without them, servicing follows the collection mode and stops too. Resume after the cause is
+recorded. Servicing mode `disabled` also stops provider reads, for incidents only.
 
 **Rollback:** the same switch. No schema change is involved. Money already collected sits in the
 school's own account and is refunded through the normal refund flow.
