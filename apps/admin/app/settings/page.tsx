@@ -671,6 +671,7 @@ export default function SettingsPage() {
         <ModulesSettingsCard
           modules={modules}
           canToggle={canEditOrg && process.env.NODE_ENV !== "production"}
+          canToggleFinance={canEditOrg && currentOrgIsMasterOrg}
           isLoading={modulesLoading}
           savingModule={savingModule}
           error={modulesError}
