@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { applyTenantContext } from "../index";
+import { applyTenantContext, runTransaction } from "../index";
 import {
   activeTransaction,
   runWithTransaction,
@@ -94,5 +94,28 @@ describe("transaction context", () => {
       () => applyTenantContext(scopedClient, "", "org-a"),
     );
     expect(execute).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("explicit transaction isolation", () => {
+  it("preserves ordinary transaction joining", async () => {
+    const callback = jest.fn(async (tx: Prisma.TransactionClient) => tx);
+    const result = await runWithTransaction(tenantTransaction, () =>
+      runTransaction(callback),
+    );
+    expect(result).toBe(client);
+    expect(callback).toHaveBeenCalledWith(client);
+  });
+
+  it("rejects an isolation request inside an existing transaction before writing", async () => {
+    const callback = jest.fn(async () => undefined);
+    await runWithTransaction(tenantTransaction, async () => {
+      await expect(
+        runTransaction(callback, { isolationLevel: "Serializable" }),
+      ).rejects.toThrow(
+        "Cannot set isolation inside an active database transaction",
+      );
+    });
+    expect(callback).not.toHaveBeenCalled();
   });
 });
