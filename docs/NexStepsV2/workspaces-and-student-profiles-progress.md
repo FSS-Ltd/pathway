@@ -94,3 +94,27 @@ lint and formatting were checked explicitly. Authenticated responsive and
 focus review remains unavailable in this isolated checkout because Clerk's
 external sign-in handshake cannot be completed here. The Graphify code graph
 was refreshed; its HTML view exceeds the visualisation size limit.
+
+## CF-1: Database-backed child and family filters (2026-10-26)
+
+Standalone follow-up to the completed workspace work above. The repository-wide
+lookup audit found three remaining blind text filters: Children, Parents &
+Guardians, and session attendance. These now share a native dropdown over the
+existing authenticated API records and filter by stable ID. Existing creation
+fields and database-backed mobile, family, learning, safeguarding, ACE, notices,
+trips and Finance choices remain. Cross-origin child/parent lookups now include
+the active-site cookies and return safe errors. No schema or dependency changes.
+
+Implementation is locally verified; PR/CI/merge gate remains open. Plan, audit,
+acceptance criteria and verification evidence are in
+[the CF-1 record](../superpowers/plans/2026-10-26-child-family-selection.md).
+The branch is `feature/child-family-db-selection`, based on host-verified merged
+PR #750 at `ba3d7fd282b4aaf19d4ae5f9a0857dc6246b0ee8`.
+
+Local admin full unit suite, typecheck, changed-file lint/formatting, production
+build and independent review passed. Desktop/mobile component previews and
+keyboard type-ahead used synthetic HTTP data; live signed-in database E2E was
+not run because no isolated Clerk identity/database setup was available. No
+server implementation changed. Graphify updated its code graph; the HTML view
+exceeds its size limit. Next permissible action: publish CF-1, verify current-head
+CI, obtain merge authorization, then confirm the host-reported merge.

@@ -2,18 +2,12 @@
 
 import React from "react";
 import { RotateCcw } from "lucide-react";
-import {
-  Badge,
-  Button,
-  Card,
-  DataTable,
-  type ColumnDef,
-  Input,
-} from "@pathway/ui";
+import { Badge, Button, Card, DataTable, type ColumnDef } from "@pathway/ui";
 import type {
   AdminAttendanceDetail,
   SaveAttendanceRow,
 } from "../../../lib/api-client";
+import { RecordFilter } from "../../../components/record-filter";
 import { AdminAttendanceSaveError } from "../../../lib/attendance-save-error";
 import { subscribeToActiveSiteChanges } from "../../../lib/active-site-events";
 import { getInitials } from "../../../lib/names";
@@ -79,7 +73,7 @@ export function AttendanceRegister({
   const [statusFilter, setStatusFilter] = React.useState<
     "all" | AttendanceDisplayStatus
   >("all");
-  const [childSearch, setChildSearch] = React.useState("");
+  const [selectedChildId, setSelectedChildId] = React.useState("");
   const [selectedHistory, setSelectedHistory] = React.useState<{
     attendanceId: string;
     childName: string;
@@ -96,8 +90,18 @@ export function AttendanceRegister({
     [detail.rows],
   );
 
+  const updateAuthoritative = React.useCallback(
+    (next: AdminAttendanceDetail) => {
+      setAuthoritative(next);
+      setSelectedChildId((current) =>
+        next.rows.some((row) => row.childId === current) ? current : "",
+      );
+    },
+    [],
+  );
+
   React.useEffect(() => {
-    setAuthoritative(detail);
+    updateAuthoritative(detail);
     setDraftStatus(statusMap(detail));
     setReasons({});
     setValidation({});
@@ -105,7 +109,7 @@ export function AttendanceRegister({
     setSaveSuccess(null);
     setNeedsReconciliation(false);
     uncertainRowsRef.current = null;
-  }, [detail, detailVersion]);
+  }, [detail, detailVersion, updateAuthoritative]);
 
   React.useEffect(() => {
     if (saveSuccess) successRef.current?.focus();
@@ -172,7 +176,7 @@ export function AttendanceRegister({
 
       try {
         const updated = await onReconcile();
-        setAuthoritative(updated);
+        updateAuthoritative(updated);
         if (hasAppliedRows(updated, rows)) {
           setDraftStatus(statusMap(updated));
           setReasons({});
@@ -197,7 +201,7 @@ export function AttendanceRegister({
         );
       }
     },
-    [onReconcile],
+    [onReconcile, updateAuthoritative],
   );
 
   const save = React.useCallback(async () => {
@@ -225,7 +229,7 @@ export function AttendanceRegister({
     setSaveSuccess(null);
     try {
       const updated = await onSave(rows);
-      setAuthoritative(updated);
+      updateAuthoritative(updated);
       setDraftStatus(statusMap(updated));
       setReasons({});
       setValidation({});
@@ -248,7 +252,7 @@ export function AttendanceRegister({
       submissionGate.current = false;
       setIsSaving(false);
     }
-  }, [changes, onSave, reasons, reconcileUnknownOutcome]);
+  }, [changes, onSave, reasons, reconcileUnknownOutcome, updateAuthoritative]);
 
   const checkServerStatus = React.useCallback(async () => {
     const rows = uncertainRowsRef.current;
@@ -347,15 +351,14 @@ export function AttendanceRegister({
   );
 
   const filteredRows = React.useMemo(() => {
-    const query = childSearch.trim().toLowerCase();
     return authoritative.rows.filter((row) => {
       const selected = draftStatus.get(row.childId) ?? row.status;
       return (
-        (!query || row.childName.toLowerCase().includes(query)) &&
+        (!selectedChildId || row.childId === selectedChildId) &&
         (statusFilter === "all" || selected === statusFilter)
       );
     });
-  }, [authoritative.rows, childSearch, draftStatus, statusFilter]);
+  }, [authoritative.rows, selectedChildId, draftStatus, statusFilter]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -480,12 +483,15 @@ export function AttendanceRegister({
               ),
             )}
           </div>
-          <Input
-            aria-label="Search children"
-            className="min-h-11 max-w-xs"
-            onChange={(event) => setChildSearch(event.target.value)}
-            placeholder="Search by child name…"
-            value={childSearch}
+          <RecordFilter
+            label="Filter by child"
+            allLabel="All children"
+            options={authoritative.rows.map((row) => ({
+              id: row.childId,
+              label: row.childName,
+            }))}
+            value={selectedChildId}
+            onChange={setSelectedChildId}
           />
           {canManage ? (
             <>
@@ -520,7 +526,7 @@ export function AttendanceRegister({
           rowKey={(row) => row.childId}
           pagination={{
             mode: "client",
-            resetKey: `${childSearch}:${statusFilter}`,
+            resetKey: `${selectedChildId}:${statusFilter}`,
           }}
           emptyMessage={
             authoritative.rows.length === 0

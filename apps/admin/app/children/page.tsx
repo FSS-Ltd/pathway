@@ -9,11 +9,11 @@ import {
   Button,
   Card,
   DataTable,
-  Input,
   Select,
   type ColumnDef,
 } from "@pathway/ui";
 import { AdminChildRow, fetchChildren } from "../../lib/api-client";
+import { RecordFilter } from "@/components/record-filter";
 import { useOrgLabel } from "@/lib/use-org-ui";
 import { useAdminAccess } from "@/lib/use-admin-access";
 
@@ -24,13 +24,15 @@ export default function ChildrenPage() {
   const [data, setData] = React.useState<AdminChildRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = React.useState("");
+  const [selectedChildId, setSelectedChildId] = React.useState("");
   const [ageFilter, setAgeFilter] = React.useState<string>("all");
   const router = useRouter();
 
   const load = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    setData([]);
+    setSelectedChildId("");
     try {
       const result = await fetchChildren();
       setData(result);
@@ -57,16 +59,12 @@ export default function ChildrenPage() {
   }, [data]);
 
   const filteredData = React.useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
     return data.filter((row) => {
-      const nameMatch = query
-        ? (row.fullName?.toLowerCase() ?? "").includes(query) ||
-          (row.preferredName?.toLowerCase() ?? "").includes(query)
-        : true;
+      const nameMatch = !selectedChildId || row.id === selectedChildId;
       const ageMatch = ageFilter === "all" ? true : row.ageGroup === ageFilter;
       return nameMatch && ageMatch;
     });
-  }, [data, searchQuery, ageFilter]);
+  }, [data, selectedChildId, ageFilter]);
 
   const columns = React.useMemo<ColumnDef<AdminChildRow>[]>(
     () => [
@@ -172,7 +170,7 @@ export default function ChildrenPage() {
       </div>
       <Card
         title="Children Roster"
-        description="Mock data for now. Will respect tenant scoping and organisation consent rules."
+        description="Choose a child from the current site’s records."
       >
         {error ? (
           <div className="flex flex-col gap-2 rounded-md bg-status-danger/5 p-4 text-sm text-status-danger">
@@ -187,12 +185,23 @@ export default function ChildrenPage() {
         ) : (
           <>
             <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search children…"
-                className="md:max-w-xs"
-                aria-label="Search children"
+              <RecordFilter
+                label="Filter by child"
+                allLabel="All children"
+                options={data.map((child) => ({
+                  id: child.id,
+                  label: child.fullName,
+                  detail: [
+                    child.preferredName,
+                    child.primaryGroup,
+                    child.ageGroup,
+                  ]
+                    .filter(Boolean)
+                    .join(" · "),
+                }))}
+                value={selectedChildId}
+                onChange={setSelectedChildId}
+                isLoading={isLoading}
               />
               <Select
                 value={ageFilter}
@@ -214,7 +223,7 @@ export default function ChildrenPage() {
               rowKey={(row) => row.id}
               pagination={{
                 mode: "client",
-                resetKey: `${searchQuery}:${ageFilter}`,
+                resetKey: `${selectedChildId}:${ageFilter}`,
               }}
               columns={columns}
               isLoading={isLoading}
