@@ -158,7 +158,8 @@ jobs:
         run: pnpm --filter @pathway/nexsteps-home test:unit
 
       - name: Test (Unit) - api
-        timeout-minutes: 8
+        # Allow headroom for the full API suite on hosted runners.
+        timeout-minutes: 12
         run: pnpm --filter @pathway/api test:unit
 
   integration:
