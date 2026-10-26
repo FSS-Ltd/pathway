@@ -10,6 +10,7 @@ import {
   type ColumnDef,
 } from "@pathway/ui";
 import type { AccessPerson, MatrixRole } from "@/lib/roles-access-api";
+import { RecordFilter } from "@/components/record-filter";
 import type { useCursorPage } from "./use-cursor-page";
 
 type DirectoryPage = ReturnType<typeof useCursorPage<AccessPerson>>;
@@ -31,7 +32,7 @@ export function PeopleDirectory({
   roleFilter: string;
   onRoleFilterChange: (value: string) => void;
   selectedId: string | null;
-  onSelect: (person: AccessPerson) => void;
+  onSelect: (person: AccessPerson | null) => void;
 }) {
   const roleNames = new Map(roles.map((role) => [role.id, role.name]));
   const columns: ColumnDef<AccessPerson>[] = [
@@ -96,14 +97,28 @@ export function PeopleDirectory({
       </div>
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
         <div>
-          <Label htmlFor="access-people-search">Search people</Label>
-          <Input
-            id="access-people-search"
-            type="search"
-            value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Name or email"
+          <RecordFilter
+            label="Select a person"
+            allLabel="Choose from this page"
+            options={
+              page.error
+                ? []
+                : page.items.map((person) => ({
+                    id: person.id,
+                    label: person.displayName || person.name || person.email,
+                    detail: person.email,
+                  }))
+            }
+            value={selectedId ?? ""}
+            onChange={(id) =>
+              onSelect(page.items.find((person) => person.id === id) ?? null)
+            }
+            isLoading={page.isLoading}
           />
+          <p className="mt-1 text-xs text-text-muted">
+            Choose from this page. Use the table's page controls below to browse
+            more people.
+          </p>
         </div>
         <div>
           <Label htmlFor="access-role-filter">Fixed role</Label>
@@ -119,6 +134,18 @@ export function PeopleDirectory({
               </option>
             ))}
           </Select>
+        </div>
+        <div className="sm:col-span-2 xl:col-span-1">
+          <Label htmlFor="access-people-search">
+            Narrow by name or email (optional)
+          </Label>
+          <Input
+            id="access-people-search"
+            type="search"
+            value={search}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="Narrow the available people"
+          />
         </div>
       </div>
       <DataTable

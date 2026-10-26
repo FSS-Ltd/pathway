@@ -37,3 +37,20 @@ Playwright exercised the actual changed page/register components with existing T
 [PR #751](https://github.com/FSS-Ltd/pathway/pull/751) targets `master` from `feature/child-family-db-selection`. The implementation revision `ea02799440e471bca374d6cd6403b3ddaebf9dcb` passed the local checks above. The unchanged commit hook also passed repository lint, API 376 suites / 2,552 tests, workers 24 suites / 139 tests, and auth 3 suites / 15 tests with a temporary two-worker CPU budget. An earlier unbounded run was interrupted after heavy memory swapping and is not counted as passing.
 
 The PR's **CF-1 delivery evidence** section maintains the current checked head and test-merge revisions, individual CI conclusions, review status, and host-reported merge commit. Consult that live record for delivery state rather than treating this implementation checklist as proof of merge. The user authorized merging PR #751 only after all required CI passes. No production deployment has been requested here.
+
+## CF-2: Roles and Access correction
+
+The user reported that Roles and Access was missed. Its People directory already reads the permission-protected, organisation-scoped `/access/users` endpoint, but its only filter requires typing. Add the same native record dropdown used by CF-1. Choices come from the current bounded directory page, include email context, and open the selected person's existing access profile by ID. Retain the table, fixed-role filter, row selection and cursor pagination. Keep name/email narrowing as an optional control beneath the dropdown. Explain how to browse further pages beside the dropdown. Hide stale choices during loading and after failures.
+
+This corrects the original audit's exclusion of the access directory. A dropdown over every organisation member would require unbounded fetching; a custom searchable combobox would duplicate the existing directory's pagination and loading logic. Reusing the native dropdown over each page preserves bounded queries and keyboard support without dependencies or new API permissions. New-record creation and badge-name search retain their existing controls.
+
+**Files:** `people-directory.tsx` owns the dropdown and page hint; `roles-workspace.tsx` accepts clearing person selection; `page.test.tsx` verifies the real workspace and HTTP boundary. No API, schema or permission changes. Roll back by reverting the CF-2 commit.
+
+- [x] Add a failing workspace regression for the missing person dropdown, duplicate names, paginated choices, fixed-role filtering and loading/error states.
+- [x] Add the shared record dropdown with optional narrowing for larger directories.
+- [x] Run the regression, full admin unit suite, typecheck, lint, formatting, build, desktop/mobile inspection, Graphify update and diff review.
+- [ ] Commit, open a follow-up PR and record current-revision checks and delivery state there.
+
+**CF-2 verification:** The workspace regression failed first because the dropdown was absent, then passed with the fix. Full admin `test:unit`, `typecheck`, changed-file ESLint/Prettier, `git diff --check` and the admin production build passed. The build used the same explicit mock flag and synthetic Clerk key as CF-1. Independent review found no actionable issues. Codex in-app browser inspection covered keyboard selection of duplicate names, the selected profile, pagination, and mobile selection/back navigation in a 390×844 iframe. The mobile document and viewport both measured 390px wide; the dropdown measured 44px high. Synthetic HTTP records and the real workspace/components/styles were used; live signed-in database browser testing remains unavailable. Preview-only favicon 404 was the only browser error. The Chrome automation session was closed at the user's request; browser work now uses the in-app browser under a persisted global rule.
+
+The follow-up PR for `fix/roles-access-person-selection` maintains current-head CI and merge evidence. Local implementation verification is not a claim that the delivery step has merged. No production deployment is part of this correction.

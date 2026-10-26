@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import React, { act } from "react";
 import { AdminContextRuntime } from "@/lib/admin-context";
+import { setApiTokenGetter } from "@/lib/api-transport";
 import type { SessionContextValue } from "@/lib/use-session-compat";
 import RolesAdminPage from "./page";
 
@@ -23,11 +24,15 @@ Object.defineProperty(globalThis, "navigator", {
 
 const nativeFetch = globalThis.fetch;
 let failPeople = true;
+let emptyPeople = false;
+let pendingPeople: Promise<Response> | null = null;
 let failBadgeOnce = true;
 let badgeState: "inherit" | "enabled" | "excluded" = "inherit";
 let badgeRevision = "";
 let conflictOnNextBadge = false;
 let roleAdded = false;
+const directoryRequests: URL[] = [];
+const accessRequests: string[] = [];
 const badgeRequestIds: string[] = [];
 const badgeExpectedRevisions: string[] = [];
 const session: SessionContextValue = {
@@ -54,8 +59,10 @@ async function settle(): Promise<void> {
 }
 
 async function run(): Promise<void> {
+  setApiTokenGetter(async () => "test");
   globalThis.fetch = async (input, init) => {
-    const path = new URL(String(input)).pathname;
+    const url = new URL(String(input));
+    const path = url.pathname;
     if (path === "/auth/active-site") {
       return response({
         activeSiteId: "site-1",
@@ -124,32 +131,67 @@ async function run(): Promise<void> {
       });
     }
     if (path === "/access/users") {
+      directoryRequests.push(url);
+      assert.equal(init?.credentials, "include");
+      assert.equal(
+        new Headers(init?.headers).get("Authorization"),
+        "Bearer test",
+      );
+      if (pendingPeople) return pendingPeople;
+      if (emptyPeople) return response({ items: [], nextCursor: null });
       return failPeople
         ? response({ detail: "private database trace" }, 503)
         : response({
-            items: [
-              {
-                id: "person-1",
-                name: "Alex Person",
-                displayName: null,
-                email: "alex@example.com",
-                isActive: true,
-                superUser: false,
-                hasFamilyAccess: false,
-                orgRole: "ORG_MEMBER",
-                roleDefinitionIds: ["role-1"],
-              },
-            ],
-            nextCursor: null,
+            items: url.searchParams.has("cursor")
+              ? [
+                  {
+                    id: "person-3",
+                    name: "Morgan Lane",
+                    displayName: null,
+                    email: "morgan@example.com",
+                    isActive: true,
+                    superUser: false,
+                    hasFamilyAccess: true,
+                    orgRole: "ORG_MEMBER",
+                    roleDefinitionIds: [],
+                  },
+                ]
+              : [
+                  {
+                    id: "person-1",
+                    name: "Alex Person",
+                    displayName: null,
+                    email: "alex@example.com",
+                    isActive: true,
+                    superUser: false,
+                    hasFamilyAccess: false,
+                    orgRole: "ORG_MEMBER",
+                    roleDefinitionIds: ["role-1"],
+                  },
+                  {
+                    id: "person-2",
+                    name: "Alex Person",
+                    displayName: null,
+                    email: "other-alex@example.com",
+                    isActive: true,
+                    superUser: false,
+                    hasFamilyAccess: true,
+                    orgRole: "ORG_MEMBER",
+                    roleDefinitionIds: [],
+                  },
+                ],
+            nextCursor: url.searchParams.has("cursor") ? null : "person-2",
           });
     }
-    if (path === "/access/tags/users/person-1/matrix") {
+    if (/^\/access\/tags\/users\/person-[12]\/matrix$/.test(path)) {
+      accessRequests.push(path);
+      const duplicate = path.includes("person-2");
       return response({
         user: {
-          id: "person-1",
+          id: duplicate ? "person-2" : "person-1",
           name: "Alex Person",
           displayName: null,
-          email: "alex@example.com",
+          email: duplicate ? "other-alex@example.com" : "alex@example.com",
           isActive: true,
           superUser: false,
         },
@@ -291,6 +333,18 @@ async function run(): Promise<void> {
 
     assert.match(container.textContent ?? "", /Unable to load people/);
     assert.match(container.textContent ?? "", /support-123/);
+    const personPicker = () => {
+      const control = container.querySelector<HTMLSelectElement>(
+        'select[aria-label="Select a person"]',
+      );
+      assert.ok(
+        control,
+        "Roles and Access must offer database-backed person choices",
+      );
+      return control;
+    };
+    assert.equal(personPicker().disabled, true);
+    assert.equal(personPicker().options.length, 1);
 
     failPeople = false;
     const retry = Array.from(container.querySelectorAll("button")).find(
@@ -301,9 +355,72 @@ async function run(): Promise<void> {
     await settle();
     assert.doesNotMatch(container.textContent ?? "", /Unable to load people/);
     assert.match(container.textContent ?? "", /Alex Person/);
-    const row = container.querySelector<HTMLTableRowElement>("tbody tr");
-    assert.ok(row);
-    await act(async () => row.click());
+    assert.match(
+      container.textContent ?? "",
+      /Narrow by name or email \(optional\)/,
+    );
+    assert.deepEqual(
+      Array.from(personPicker().options).map((option) => [
+        option.value,
+        option.text,
+      ]),
+      [
+        ["", "Choose from this page"],
+        ["person-1", "Alex Person · alex@example.com"],
+        ["person-2", "Alex Person · other-alex@example.com"],
+      ],
+    );
+    const change = async (control: HTMLSelectElement, value: string) => {
+      await act(async () => {
+        control.value = value;
+        control.dispatchEvent(
+          new dom.window.Event("change", { bubbles: true }),
+        );
+      });
+      await settle();
+    };
+    const directoryCount = directoryRequests.length;
+    await change(personPicker(), "person-2");
+    assert.equal(accessRequests.at(-1), "/access/tags/users/person-2/matrix");
+    assert.match(
+      container.querySelector('[aria-labelledby="selected-person-title"]')
+        ?.textContent ?? "",
+      /other-alex@example.com/,
+    );
+    assert.equal(
+      directoryRequests.length,
+      directoryCount,
+      "Selecting a record must not query by its name",
+    );
+    const next = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Next",
+    );
+    assert.ok(next);
+    await act(async () => next.click());
+    await settle();
+    assert.equal(
+      directoryRequests.at(-1)?.searchParams.get("cursor"),
+      "person-2",
+    );
+    assert.equal(personPicker().options[1]?.value, "person-3");
+    assert.equal(personPicker().options.length, 2);
+    assert.equal(
+      personPicker().value,
+      "",
+      "A selection on another page must not masquerade as a current choice",
+    );
+    const roleFilter = container.querySelector<HTMLSelectElement>(
+      "#access-role-filter",
+    );
+    assert.ok(roleFilter);
+    await change(roleFilter, "role-1");
+    assert.equal(
+      directoryRequests.at(-1)?.searchParams.get("roleDefinitionId"),
+      "role-1",
+    );
+    assert.equal(directoryRequests.at(-1)?.searchParams.has("cursor"), false);
+    await change(personPicker(), "person-1");
+    assert.equal(accessRequests.at(-1), "/access/tags/users/person-1/matrix");
     await settle();
     assert.match(container.textContent ?? "", /Selected person/);
     assert.match(container.textContent ?? "", /alex@example.com/);
@@ -444,8 +561,47 @@ async function run(): Promise<void> {
       "true",
     );
     assert.doesNotMatch(container.textContent ?? "", /Invite person/);
+
+    const refresh = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "Refresh",
+    );
+    assert.ok(refresh);
+    let resolvePeople: (value: Response) => void = () =>
+      assert.fail("Directory request must be pending");
+    pendingPeople = new Promise((resolve) => {
+      resolvePeople = resolve;
+    });
+    await act(async () => refresh.click());
+    assert.equal(personPicker().disabled, true);
+    assert.equal(
+      personPicker().options.length,
+      1,
+      "Loading must hide old choices",
+    );
+    await act(async () =>
+      resolvePeople(response({ detail: "private database trace" }, 503)),
+    );
+    await settle();
+    pendingPeople = null;
+    assert.equal(personPicker().disabled, true);
+    assert.equal(
+      personPicker().options.length,
+      1,
+      "A failed refresh must not leave old choices",
+    );
+    assert.doesNotMatch(container.textContent ?? "", /private database trace/);
+    emptyPeople = true;
+    await act(async () => refresh.click());
+    await settle();
+    assert.equal(personPicker().disabled, true);
+    assert.equal(personPicker().options[0]?.text, "No records available");
+    emptyPeople = false;
+    await act(async () => refresh.click());
+    await settle();
+    assert.equal(personPicker().disabled, false);
   } finally {
     await act(async () => root.unmount());
+    setApiTokenGetter(null);
     globalThis.fetch = nativeFetch;
   }
 }

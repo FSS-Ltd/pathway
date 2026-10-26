@@ -149,8 +149,8 @@ export default function RolesWorkspace() {
     snapshot?.sites.find((site) => site.id === snapshot.activeSiteId)?.name ??
     null;
   const orgName = snapshot?.org.name ?? "Organisation";
-  const selectPerson = (person: AccessPerson) => {
-    if (selected?.id !== person.id) setPersonTab("profile");
+  const selectPerson = (person: AccessPerson | null) => {
+    if (selected?.id !== person?.id) setPersonTab("profile");
     setSelected(person);
   };
   const refresh = () => {
