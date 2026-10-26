@@ -132,6 +132,30 @@ async function run(): Promise<void> {
       />,
     );
 
+    const childFilter = element<HTMLSelectElement>(
+      container,
+      'select[aria-label="Filter by child"]',
+    );
+    assert.deepEqual(
+      [...childFilter.options].map((option) => option.value),
+      ["", "child-1", "child-2"],
+      "child options come from the session roster",
+    );
+    await act(async () => {
+      childFilter.value = "child-2";
+      childFilter.dispatchEvent(
+        new dom.window.Event("change", { bubbles: true }),
+      );
+    });
+    assert.equal(container.querySelector("#attendance-child-1-late"), null);
+    assert.ok(container.querySelector("#attendance-child-2-late"));
+    await act(async () => {
+      childFilter.value = "";
+      childFilter.dispatchEvent(
+        new dom.window.Event("change", { bubbles: true }),
+      );
+    });
+
     const late = element<HTMLButtonElement>(
       container,
       "#attendance-child-1-late",
@@ -358,6 +382,91 @@ async function run(): Promise<void> {
     assert.deepEqual(initialMarks[0], [
       { childId: "child-2", status: "PRESENT" },
     ]);
+    const remainingDetail = { ...initialDetail, rows: [initialDetail.rows[0]] };
+    await render(
+      root,
+      <AttendanceRegister
+        key="reconcile-removal"
+        canManage
+        detail={initialDetail}
+        onSave={async () => {
+          throw new AdminAttendanceSaveError("unknown", null);
+        }}
+        onReconcile={async () => remainingDetail}
+      />,
+    );
+    const reconcileFilter = element<HTMLSelectElement>(
+      container,
+      'select[aria-label="Filter by child"]',
+    );
+    await act(async () => {
+      reconcileFilter.value = "child-2";
+      reconcileFilter.dispatchEvent(
+        new dom.window.Event("change", { bubbles: true }),
+      );
+    });
+    await click(
+      element<HTMLButtonElement>(container, "#attendance-child-2-late"),
+    );
+    await change(
+      element<HTMLInputElement>(
+        container,
+        "#attendance-correction-reason-child-2",
+      ),
+      "Corrected arrival",
+    );
+    await click(element<HTMLButtonElement>(container, "#attendance-save"));
+    assert.equal(reconcileFilter.value, "");
+    assert.ok(
+      container.querySelector("#attendance-child-1-late"),
+      "reconciliation clears a removed selection and shows the remaining roster",
+    );
+
+    const duplicateDetail = {
+      ...initialDetail,
+      rows: initialDetail.rows.map((row) => ({
+        ...row,
+        childName: "Sam Lane",
+      })),
+    };
+    await render(
+      root,
+      <AttendanceRegister
+        canManage
+        detail={duplicateDetail}
+        onSave={async () => duplicateDetail}
+      />,
+    );
+    const duplicateFilter = element<HTMLSelectElement>(
+      container,
+      'select[aria-label="Filter by child"]',
+    );
+    assert.notEqual(
+      duplicateFilter.options[1].text,
+      duplicateFilter.options[2].text,
+    );
+    await act(async () => {
+      duplicateFilter.value = "child-2";
+      duplicateFilter.dispatchEvent(
+        new dom.window.Event("change", { bubbles: true }),
+      );
+    });
+    assert.equal(container.querySelector("#attendance-child-1-late"), null);
+    assert.ok(container.querySelector("#attendance-child-2-late"));
+    await render(
+      root,
+      <AttendanceRegister
+        canManage
+        detail={{ ...duplicateDetail, rows: [duplicateDetail.rows[0]] }}
+        onSave={async () => duplicateDetail}
+      />,
+    );
+    assert.equal(
+      duplicateFilter.value,
+      "",
+      "a refreshed register clears a missing child",
+    );
+    assert.ok(container.querySelector("#attendance-child-1-late"));
   } finally {
     await act(async () => root.unmount());
     container.remove();

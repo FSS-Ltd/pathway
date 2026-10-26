@@ -3460,12 +3460,13 @@ export async function fetchChildren(): Promise<AdminChildRow[]> {
   const res = await fetch(`${API_BASE_URL}/children`, {
     headers: buildAuthHeaders(),
     cache: "no-store",
+    credentials: "include",
   });
 
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to fetch children (${res.status}): ${body || res.statusText}`,
+    throw await apiErrorFromResponse(
+      res,
+      "Unable to load children. Please retry.",
     );
   }
 
@@ -3988,12 +3989,13 @@ export async function fetchParents(): Promise<AdminParentRow[]> {
   const res = await fetch(`${API_BASE_URL}/parents`, {
     headers: buildAuthHeaders(),
     cache: "no-store",
+    credentials: "include",
   });
 
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to fetch parents: ${res.status} ${body || res.statusText}`,
+    throw await apiErrorFromResponse(
+      res,
+      "Unable to load parents and guardians. Please retry.",
     );
   }
 

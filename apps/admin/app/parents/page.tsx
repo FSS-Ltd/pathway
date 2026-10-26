@@ -8,11 +8,11 @@ import {
   Button,
   Card,
   DataTable,
-  Input,
   Select,
   type ColumnDef,
 } from "@pathway/ui";
 import { AdminParentRow, fetchParents } from "../../lib/api-client";
+import { RecordFilter } from "@/components/record-filter";
 import { useOrgLabel } from "@/lib/use-org-ui";
 
 export default function ParentsPage() {
@@ -21,7 +21,7 @@ export default function ParentsPage() {
   const [data, setData] = React.useState<AdminParentRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = React.useState("");
+  const [selectedParentId, setSelectedParentId] = React.useState("");
   const [childrenFilter, setChildrenFilter] = React.useState<
     "all" | "with" | "without"
   >("all");
@@ -30,6 +30,8 @@ export default function ParentsPage() {
   const load = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    setData([]);
+    setSelectedParentId("");
     try {
       const result = await fetchParents();
       setData(result);
@@ -48,12 +50,8 @@ export default function ParentsPage() {
   }, [sessionStatus, session, load]);
 
   const filteredData = React.useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
     return data.filter((row) => {
-      const matchesQuery = query
-        ? (row.fullName?.toLowerCase() ?? "").includes(query) ||
-          (row.email?.toLowerCase() ?? "").includes(query)
-        : true;
+      const matchesQuery = !selectedParentId || row.id === selectedParentId;
       const hasChildren =
         typeof row.childrenCount === "number" ? row.childrenCount > 0 : true;
       const matchesChildren =
@@ -64,7 +62,7 @@ export default function ParentsPage() {
             : !hasChildren;
       return matchesQuery && matchesChildren;
     });
-  }, [data, searchQuery, childrenFilter]);
+  }, [data, selectedParentId, childrenFilter]);
 
   const columns = React.useMemo<ColumnDef<AdminParentRow>[]>(
     () => [
@@ -176,12 +174,17 @@ export default function ParentsPage() {
         ) : (
           <>
             <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search parents or guardians…"
-                className="md:max-w-xs"
-                aria-label="Search parents or guardians"
+              <RecordFilter
+                label="Filter by parent or guardian"
+                allLabel="All parents and guardians"
+                options={data.map((parent) => ({
+                  id: parent.id,
+                  label: parent.fullName,
+                  detail: parent.email,
+                }))}
+                value={selectedParentId}
+                onChange={setSelectedParentId}
+                isLoading={isLoading}
               />
               <Select
                 value={childrenFilter}
@@ -202,7 +205,7 @@ export default function ParentsPage() {
               rowKey={(row) => row.id}
               pagination={{
                 mode: "client",
-                resetKey: `${searchQuery}:${childrenFilter}`,
+                resetKey: `${selectedParentId}:${childrenFilter}`,
               }}
               columns={columns}
               isLoading={isLoading}
