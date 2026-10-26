@@ -16,7 +16,7 @@
 - [x] Build shared `components/record-filter.tsx` with the existing Select, then replace the three free-text filters.
 - [x] Test directory fetch-to-selection behavior and empty/loading/failure/refresh states; retain existing attendance save regressions.
 - [x] Run admin unit suite, typecheck, lint, changed-file formatting, build, browser desktop/mobile and keyboard inspection, Graphify update and final diff review.
-- [ ] Commit and open CF-1 PR; record CI revision, results and merge gate.
+- [x] Commit and open CF-1 PR; record CI revision, results and merge gate.
 
 ## Audit evidence
 
@@ -31,3 +31,9 @@ Started from `ba3d7fd282b4aaf19d4ae5f9a0857dc6246b0ee8`. GitHub confirmed predec
 Admin typecheck, full unit script, changed-file ESLint, changed-file Prettier and production build passed. The build used explicit mock mode and a synthetic Clerk publishable key; it confirms compilation, not a production login. Regression tests cover authenticated API-backed choices and credentials, exact IDs with duplicate names, all-records reset, combined secondary filters, loading, empty/error/retry, and removal during refresh/reconciliation. Independent code review found one reconciliation reset issue; a failing regression reproduced it, the fix passed, and review found no remaining issues.
 
 Playwright exercised the actual changed page/register components with existing Tailwind styles in an isolated local preview using synthetic HTTP API records and SessionRuntime. Desktop 1440×1000 and mobile 390×844 were inspected. Native parent dropdown selection via Tab, name type-ahead and Tab worked; accessible names, visible focus, 44px dropdown targets, ID selection and responsive results were checked. This does not verify live Clerk login or a deployed database. Browser console had only the preview favicon 404. Graphify refreshed the code graph; HTML export was skipped by its size limit.
+
+## Delivery evidence
+
+[PR #751](https://github.com/FSS-Ltd/pathway/pull/751) targets `master` from `feature/child-family-db-selection`. The implementation revision `ea02799440e471bca374d6cd6403b3ddaebf9dcb` passed the local checks above. The unchanged commit hook also passed repository lint, API 376 suites / 2,552 tests, workers 24 suites / 139 tests, and auth 3 suites / 15 tests with a temporary two-worker CPU budget. An earlier unbounded run was interrupted after heavy memory swapping and is not counted as passing.
+
+The PR's **CF-1 delivery evidence** section maintains the current checked head and test-merge revisions, individual CI conclusions, review status, and host-reported merge commit. Consult that live record for delivery state rather than treating this implementation checklist as proof of merge. The user authorized merging PR #751 only after all required CI passes. No production deployment has been requested here.

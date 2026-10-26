@@ -105,8 +105,11 @@ fields and database-backed mobile, family, learning, safeguarding, ACE, notices,
 trips and Finance choices remain. Cross-origin child/parent lookups now include
 the active-site cookies and return safe errors. No schema or dependency changes.
 
-Implementation is locally verified; PR/CI/merge gate remains open. Plan, audit,
-acceptance criteria and verification evidence are in
+Implementation and local verification are recorded in
+[PR #751](https://github.com/FSS-Ltd/pathway/pull/751), targeting `master`.
+The PR’s **CF-1 delivery evidence** section is the current record for checked
+head/test-merge revisions, CI results, review status and host-reported merge
+evidence. Plan, audit, acceptance criteria and local verification evidence are in
 [the CF-1 record](../superpowers/plans/2026-10-26-child-family-selection.md).
 The branch is `feature/child-family-db-selection`, based on host-verified merged
 PR #750 at `ba3d7fd282b4aaf19d4ae5f9a0857dc6246b0ee8`.
@@ -116,5 +119,6 @@ build and independent review passed. Desktop/mobile component previews and
 keyboard type-ahead used synthetic HTTP data; live signed-in database E2E was
 not run because no isolated Clerk identity/database setup was available. No
 server implementation changed. Graphify updated its code graph; the HTML view
-exceeds its size limit. Next permissible action: publish CF-1, verify current-head
-CI, obtain merge authorization, then confirm the host-reported merge.
+exceeds its size limit. The user authorized merging PR #751 after all required
+CI passes. Delivery is complete only when the linked host record proves both
+passing checks for the required revision and a merged PR with its merge commit.
