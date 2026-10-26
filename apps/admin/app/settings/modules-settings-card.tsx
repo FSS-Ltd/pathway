@@ -11,6 +11,7 @@ import {
 type ModulesSettingsCardProps = {
   modules: AdminOrgModule[];
   canToggle: boolean;
+  canToggleFinance?: boolean;
   isLoading: boolean;
   savingModule: AdminModule | null;
   error: string | null;
@@ -43,6 +44,7 @@ function statusVariant(
 export function ModulesSettingsCard({
   modules,
   canToggle,
+  canToggleFinance = false,
   isLoading,
   savingModule,
   error,
@@ -69,6 +71,13 @@ export function ModulesSettingsCard({
         </div>
       ) : (
         <div className="space-y-4">
+          {canToggleFinance ? (
+            <p className="text-sm text-text-muted">
+              Master organisation administrators can enable Finance for internal
+              testing. No subscription charge applies. Payment collection
+              requires separate Finance setup.
+            </p>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             {moduleOptions.map(([module, label]) => {
               const record = modulesByName.get(module);
@@ -107,9 +116,19 @@ export function ModulesSettingsCard({
                       </dl>
                     </div>
 
-                    {canToggle ? (
+                    {canToggle || (canToggleFinance && module === "FINANCE") ? (
                       <label className="flex items-center gap-2 text-xs text-text-muted">
-                        <span className="sr-only">Toggle {label}</span>
+                        <span
+                          className={
+                            canToggleFinance && module === "FINANCE"
+                              ? undefined
+                              : "sr-only"
+                          }
+                        >
+                          {canToggleFinance && module === "FINANCE"
+                            ? "Enabled"
+                            : `Toggle ${label}`}
+                        </span>
                         <Checkbox
                           checked={isActive}
                           disabled={savingModule !== null}
@@ -122,7 +141,7 @@ export function ModulesSettingsCard({
                     ) : null}
                   </div>
                   {isSaving ? (
-                    <p className="mt-2 text-xs text-text-muted">
+                    <p role="status" className="mt-2 text-xs text-text-muted">
                       Saving module...
                     </p>
                   ) : null}
@@ -131,12 +150,17 @@ export function ModulesSettingsCard({
             })}
           </div>
 
-          {!canToggle ? (
+          {!canToggle && !canToggleFinance ? (
             <p className="text-sm text-text-muted">
-              Organisation admins can change modules only outside production.
+              Production modules are managed through billing. Direct changes are
+              available only outside production.
             </p>
           ) : null}
-          {error ? <p className="text-sm text-status-danger">{error}</p> : null}
+          {error ? (
+            <p role="alert" className="text-sm text-status-danger">
+              {error}
+            </p>
+          ) : null}
         </div>
       )}
     </Card>

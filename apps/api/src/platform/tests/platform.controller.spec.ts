@@ -8,6 +8,12 @@ import {
   VERTICAL_CAPABILITIES,
   type Capability,
 } from "@pathway/platform";
+import { setMasterFinanceModule } from "../master-finance-module";
+
+jest.mock("../master-finance-module", () => ({
+  setMasterFinanceModule: jest.fn(),
+}));
+
 import { isModule, PlatformController } from "../platform.controller";
 
 jest.mock("@pathway/db", () => ({
@@ -29,6 +35,7 @@ jest.mock("@pathway/db", () => ({
     ORG_ADMIN: "ORG_ADMIN",
   },
   prisma: {
+    org: { findUnique: jest.fn() },
     orgModule: {
       findMany: jest.fn(),
       upsert: jest.fn(),
@@ -50,6 +57,7 @@ jest.mock("@pathway/platform", () => ({
 }));
 
 type MockPrisma = {
+  org: { findUnique: jest.Mock };
   orgModule: {
     findMany: jest.Mock;
     upsert: jest.Mock;
@@ -74,7 +82,7 @@ describe("PlatformController", () => {
   const previousNodeEnv = process.env.NODE_ENV;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     process.env.NODE_ENV = "test";
   });
 
@@ -152,19 +160,78 @@ describe("PlatformController", () => {
     });
   });
 
-  it("rejects direct module toggles in production before any write", async () => {
-    process.env.NODE_ENV = "production";
-    const controller = new PlatformController();
+  it.each([{ isMasterOrg: false }, null])(
+    "rejects customer or missing organisations in production (%p)",
+    async (org) => {
+      process.env.NODE_ENV = "production";
+      mockPrisma.org.findUnique.mockResolvedValue(org);
+      const controller = new PlatformController();
 
+      await expect(
+        controller.toggleModule(
+          "org-1",
+          { module: "FINANCE", active: true },
+          { authUserId: "admin-1" },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockPrisma.orgMembership.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.userOrgRole.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.orgModule.upsert).not.toHaveBeenCalled();
+    },
+  );
+
+  it("lets a Master administrator enable Finance in production", async () => {
+    process.env.NODE_ENV = "production";
+    mockPrisma.org.findUnique.mockResolvedValue({ isMasterOrg: true });
+    mockPrisma.orgMembership.findFirst.mockResolvedValue({ userId: "admin-1" });
+    jest
+      .mocked(setMasterFinanceModule)
+      .mockResolvedValue({ module: "FINANCE", active: true });
+    const controller = new PlatformController();
     await expect(
       controller.toggleModule(
-        "org-1",
-        { module: "FINANCE", active: true },
+        "master-org",
+        {
+          module: "FINANCE",
+          active: true,
+        },
+        { authUserId: "admin-1" },
+      ),
+    ).resolves.toBeDefined();
+  });
+
+  it("rejects a non-admin in the Master organisation", async () => {
+    process.env.NODE_ENV = "production";
+    mockPrisma.org.findUnique.mockResolvedValue({ isMasterOrg: true });
+    mockPrisma.orgMembership.findFirst.mockResolvedValue(null);
+    mockPrisma.userOrgRole.findFirst.mockResolvedValue(null);
+    await expect(
+      new PlatformController().toggleModule(
+        "master-org",
+        {
+          module: "FINANCE",
+          active: true,
+        },
+        { authUserId: "member-1" },
+      ),
+    ).rejects.toThrow(UnauthorizedException);
+    expect(setMasterFinanceModule).not.toHaveBeenCalled();
+  });
+
+  it("rejects other production modules even for Master", async () => {
+    process.env.NODE_ENV = "production";
+    mockPrisma.org.findUnique.mockResolvedValue({ isMasterOrg: true });
+    mockPrisma.orgMembership.findFirst.mockResolvedValue({ userId: "admin-1" });
+    await expect(
+      new PlatformController().toggleModule(
+        "master-org",
+        {
+          module: "EVENTS",
+          active: true,
+        },
         { authUserId: "admin-1" },
       ),
     ).rejects.toThrow(ForbiddenException);
-    expect(mockPrisma.orgMembership.findFirst).not.toHaveBeenCalled();
-    expect(mockPrisma.userOrgRole.findFirst).not.toHaveBeenCalled();
     expect(mockPrisma.orgModule.upsert).not.toHaveBeenCalled();
   });
 

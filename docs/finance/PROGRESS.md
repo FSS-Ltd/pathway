@@ -737,3 +737,31 @@ collection service (disabled, live, mixed records), mandate setup guard and live
 Finance unit suites: 92 suites, 594 tests pass; API typecheck and lint pass. The database-backed
 Finance suites run in CI. No live setting changed and nothing was debited. Switching live collection
 on, and scheduling the Bacs job, remain the owner's decisions.
+
+## MF01: Master organisation Finance activation
+
+Standalone production-access fix on `fix/master-finance-addon`, based on `master`
+`aaef6694923b05dada505e877e0d463da4766635`. The preceding Finance settings documentation
+PR #748 was verified merged at `b1ef11ac74402d3c2083c72feff247aa8cbf91c3`, with all
+thirteen checks successful on head `06a4a422110f3f22b215b65c770463c0ea7f1e79`.
+
+Root cause: Settings hid every production module toggle, while the API rejected
+all production toggles. Master billing intentionally has no subscription purchase
+flow. MF01 exposes only the Finance toggle to Master organisation administrators
+and enforces both conditions server-side against the current organisation. It
+persists a non-expiring MANUAL grant and reconciles effective access in the same
+transaction. Repeated activation uses the same grant; deactivation retains
+Finance records and existing servicing access. Customer billing and other
+production module restrictions are unchanged. No polling, dependency or migration
+is added. Existing Settings refreshes module and permission state after saving.
+
+Acceptance: Master administrators can activate Finance through Settings > Modules;
+customer organisations and non-admin users cannot use this path; stale expiry is
+cleared by the effective-grant reconciliation; duplicate requests do not create
+additional grants. Finance payment configuration and live money movement remain
+separate from module activation.
+
+Local verification and current-revision CI/merge evidence are recorded in the
+MF01 pull request. Status: implemented, awaiting PR/CI/merge and production release.
+The production goal is not complete until the released Settings flow is verified.
+No production data, payment configuration or deployment has been changed.

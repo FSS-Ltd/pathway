@@ -19,6 +19,7 @@ import {
 } from "@pathway/platform";
 import { isVertical } from "@pathway/types";
 import { AuthUserGuard } from "../auth/auth-user.guard";
+import { setMasterFinanceModule } from "./master-finance-module";
 
 interface AuthenticatedRequest {
   authUserId?: string;
@@ -129,12 +130,22 @@ export class PlatformController {
     @Body() body: unknown,
     @Req() req: AuthenticatedRequest,
   ) {
+    const { module, active } = parseModuleToggle(body);
     if (process.env.NODE_ENV === "production") {
-      throw new ForbiddenException("Module toggling is disabled in production");
+      const org = await prisma.org.findUnique({
+        where: { id: orgId },
+        select: { isMasterOrg: true },
+      });
+      if (!org?.isMasterOrg || module !== Module.FINANCE) {
+        throw new ForbiddenException(
+          "Only the Master organisation can toggle Finance in production",
+        );
+      }
+      await this.ensureOrgAdmin(req, orgId);
+      return setMasterFinanceModule(orgId, active);
     }
 
     await this.ensureOrgAdmin(req, orgId);
-    const { module, active } = parseModuleToggle(body);
     const status = active ? ModuleStatus.ACTIVE : ModuleStatus.CANCELLED;
 
     return prisma.orgModule.upsert({
