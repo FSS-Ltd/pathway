@@ -28,18 +28,18 @@ export async function withInventoryTenantTransaction<T>(
   }
 
   try {
-    return await runTransaction(async (tx) => {
-      await tx.$executeRawUnsafe(
-        "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE",
-      );
-      await applyTenantContext(tx, actor.tenantId, actor.orgId);
-      const site = await tx.tenant.findFirst({
-        where: { id: actor.tenantId, orgId: actor.orgId },
-        select: { id: true },
-      });
-      if (!site) throw new NotFoundException("Active site not found");
-      return operation(tx);
-    });
+    return await runTransaction(
+      async (tx) => {
+        await applyTenantContext(tx, actor.tenantId, actor.orgId);
+        const site = await tx.tenant.findFirst({
+          where: { id: actor.tenantId, orgId: actor.orgId },
+          select: { id: true },
+        });
+        if (!site) throw new NotFoundException("Active site not found");
+        return operation(tx);
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&

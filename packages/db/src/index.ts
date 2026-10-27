@@ -289,19 +289,27 @@ export async function applyTenantContext(
 /**
  * Join the active writable request transaction, or create one when none exists.
  * A nested callback participates in the outer transaction's rollback boundary.
+ * Explicit isolation requires a new transaction; an active one cannot be upgraded.
  */
 export async function runTransaction<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  options?: { isolationLevel: Prisma.TransactionIsolationLevel },
 ): Promise<T> {
   const active = activeTransaction();
   if (active) {
+    if (options) {
+      throw new Error(
+        "Cannot set isolation inside an active database transaction",
+      );
+    }
     if (active.scope.readOnly) {
       throw new Error("Cannot write inside a read-only database transaction");
     }
     return fn(active.client);
   }
-  return basePrismaClient.$transaction((tx) =>
-    fn(withPiiEncryptionTransaction(tx)),
+  return basePrismaClient.$transaction(
+    (tx) => fn(withPiiEncryptionTransaction(tx)),
+    options,
   );
 }
 

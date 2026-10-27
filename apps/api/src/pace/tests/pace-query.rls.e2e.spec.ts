@@ -8,6 +8,7 @@ import { AppModule } from "../../app.module";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
 import { OutboxService } from "../../common/outbox/outbox.service";
 import { PaceRequestRlsRoleLease } from "./pace-request-rls-role-lease";
+import { withInventoryTenantTransaction } from "../pace-inventory-command-context";
 import {
   clearE2eAuthAccess,
   clearE2eTypedRole,
@@ -431,6 +432,18 @@ describe("ACE PACE roster RLS", () => {
     } finally {
       requestUserId = authUserId;
     }
+  });
+
+  it("opens inventory transactions at serializable isolation before tenant queries", async () => {
+    if (!app || !fixture) return;
+    const rows = await withInventoryTenantTransaction(
+      { tenantId: tenantAId, orgId, userId: authUserId },
+      (tx) => tx.$queryRaw<Array<{ isolation: string; tenantId: string }>>`
+        SELECT current_setting('transaction_isolation') AS isolation,
+          current_setting('app.tenant_id') AS "tenantId"
+      `,
+    );
+    expect(rows).toEqual([{ isolation: "serializable", tenantId: tenantAId }]);
   });
 
   it("creates a bounded order batch with audit and outbox facts", async () => {

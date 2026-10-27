@@ -2465,3 +2465,57 @@ untouched; the accepted post-snapshot write gap and three migration-history
 exceptions remain. Monitor production and reconcile any discovered missing
 records through audited corrections; do not silently overwrite new writes by
 restoring the old snapshot.
+
+## INV-1: Repair physical PACE inventory transactions (26 October 2026)
+
+State: locally verified; PR delivery pending. Not merged or deployed.
+Branch: `fix/ace-inventory-oasis`, based on `master` at
+`6522570a161854f160d727d51ae49ff67d29a6f4`. The host confirms predecessor PR
+[#751](https://github.com/FSS-Ltd/pathway/pull/751) merged at that commit;
+all 13 reported checks on head `2c7f7b3d4a59a0d7675e41577ed3abc6cb071d90`
+succeeded.
+
+The user reports that both stock entry and order creation fail. Production
+runtime logs confirm permission checks allow both commands, then PostgreSQL
+rejects late `SET TRANSACTION ISOLATION LEVEL SERIALIZABLE` with SQLSTATE
+`25001`. Oasis's inventory implementation was inspected as a read-only
+reference. Pathway already has guarded batch stock/order commands and the
+Ordered → In transit → Delivered flow. Replacing those commands would not
+address the connection initialization failure.
+
+Set isolation through Prisma's transaction creation options before connection
+initialization and tenant queries. The shared transaction helper continues to
+join existing transactions for ordinary callers, but rejects explicit isolation
+inside an existing transaction rather than silently accepting weaker isolation.
+Retain tenant checks, placement locks, duplicate protection, audit/outbox
+atomicity and PII encryption. No schema migration, dependency, permission,
+production configuration or UI change is required.
+
+Acceptance: reproduce the production error in a regression test; prove new
+inventory transactions use serializable isolation and the requested tenant;
+verify stock creation, orders, delivery, duplicate rejection and tenant denial
+against disposable PostgreSQL; run DB/API unit, type, lint and API build checks.
+Publish this step's PR and verify current-revision CI before any merge. The PR
+will hold live head/check/merge evidence. Production remains unchanged until an
+authorized release verifies both stock and order creation through the live app.
+
+Remaining requested work: adapt Oasis inventory usability where needed, add
+editable academic-year templates, adapt the Oasis dashboard to ACE overview,
+and reuse Oasis behaviour categories as the baseline. These remain unimplemented
+until INV-1 passes the PR/CI/merge gate. The next permissible implementation
+work is resolving INV-1 verification or review failures.
+
+INV-1 local evidence: API production/serverless build, API and DB typechecks, changed-file ESLint, Prettier,
+`git diff --check`, 62 PACE unit tests (10 suites), 90 DB unit tests (13 suites),
+and 17 PACE request/RLS integration tests passed. The integration database was
+an isolated PostgreSQL 16 container with all 205 migrations applied. Its suite
+reported an existing worker teardown/open-handle warning after all assertions
+passed. The 42 environment-gated DB tests were skipped by the existing runner.
+The full API unit run was interrupted because concurrent compiler/test workers
+caused local memory pressure; full-repository validation remains required in CI.
+
+A separate same-connection-mode database probe used Prisma `pgbouncer=true`:
+the original late isolation statement reproduced SQLSTATE `25001`; the fixed
+helper returned `transaction_isolation = serializable`. No production records
+were written. Independent code review found no production defect; its test
+fixture-skip compatibility finding was resolved before delivery.
